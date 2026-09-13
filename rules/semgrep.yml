@@ -1,0 +1,24 @@
+rules:
+  - id: pervigil.javascript.browser.reverse-tabnabbing
+    message: External links opened in a new tab must prevent the new page from controlling the opener.
+    severity: WARNING
+    languages: [typescript, javascript]
+    metadata:
+      category: security
+      confidence: HIGH
+      cwe: CWE-1022
+      remediation: Add rel="noopener noreferrer" to the anchor.
+    patterns:
+      - pattern: <a ... target="_blank" ...>...</a>
+      - pattern-not-regex: '(?i)\brel\s*=\s*["''][^"'']*\b(?:noopener|noreferrer)\b'
+
+  - id: pervigil.react.security.dangerously-set-inner-html
+    message: Rendering HTML directly can create DOM XSS when the value is attacker controlled.
+    severity: ERROR
+    languages: [typescript, javascript]
+    metadata:
+      category: security
+      confidence: MEDIUM
+      cwe: CWE-79
+      remediation: Render structured React elements or sanitise with a reviewed allow-list sanitizer.
+    pattern: <$TAG ... dangerouslySetInnerHTML={$VALUE} ... />

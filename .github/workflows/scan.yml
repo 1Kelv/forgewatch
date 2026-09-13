@@ -1,0 +1,163 @@
+name: Forgewatch scan
+
+on:
+  workflow_dispatch:
+    inputs:
+      owner:
+        description: Target repository owner
+        required: true
+        default: 1Kelv
+      repository:
+        description: Target repository name
+        required: true
+        default: sentinel
+      revision:
+        description: Commit SHA, branch or tag
+        required: true
+        default: main
+      ref:
+        description: Ref recorded in the report
+        required: true
+        default: main
+      default_branch:
+        description: Target default branch
+        required: true
+        default: main
+      trigger:
+        description: Trigger recorded in the report
+        required: true
+        type: choice
+        options: [manual, push, pull_request, schedule, webhook]
+        default: manual
+  repository_dispatch:
+    types: [forgewatch_scan]
+  schedule:
+    - cron: "17 3 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: forgewatch-${{ github.event.client_payload.repository || format('{0}/{1}', inputs.owner || vars.FORGEWATCH_TARGET_OWNER || '1Kelv', inputs.repository || vars.FORGEWATCH_TARGET_REPOSITORY || 'sentinel') }}-${{ github.event.client_payload.commit || inputs.revision || 'main' }}
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      TARGET_OWNER: ${{ github.event.client_payload.target_owner || inputs.owner || vars.FORGEWATCH_TARGET_OWNER || '1Kelv' }}
+      TARGET_NAME: ${{ github.event.client_payload.target_name || inputs.repository || vars.FORGEWATCH_TARGET_REPOSITORY || 'sentinel' }}
+      TARGET_REPOSITORY: ${{ github.event.client_payload.repository || format('{0}/{1}', inputs.owner || vars.FORGEWATCH_TARGET_OWNER || '1Kelv', inputs.repository || vars.FORGEWATCH_TARGET_REPOSITORY || 'sentinel') }}
+      TARGET_REVISION: ${{ github.event.client_payload.commit || inputs.revision || 'main' }}
+      TARGET_REF: ${{ github.event.client_payload.ref || inputs.ref || 'main' }}
+      TARGET_DEFAULT_BRANCH: ${{ github.event.client_payload.default_branch || inputs.default_branch || vars.FORGEWATCH_TARGET_DEFAULT_BRANCH || 'main' }}
+      SCAN_TRIGGER: ${{ github.event.client_payload.trigger || inputs.trigger || 'schedule' }}
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+
+    steps:
+      - name: Check out Forgewatch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: forgewatch
+          persist-credentials: false
+
+      - name: Mint a target-scoped GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ secrets.FORGEWATCH_APP_ID }}
+          private-key: ${{ secrets.FORGEWATCH_APP_PRIVATE_KEY }}
+          owner: ${{ env.TARGET_OWNER }}
+          repositories: ${{ env.TARGET_NAME }}
+
+      - name: Check out the immutable target revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: ${{ env.TARGET_REPOSITORY }}
+          ref: ${{ env.TARGET_REVISION }}
+          token: ${{ steps.app-token.outputs.token }}
+          path: target
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: forgewatch/pyproject.toml
+
+      - name: Restore finding history
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: forgewatch/.forgewatch/state.db
+          key: forgewatch-state-${{ github.repository_id }}-${{ github.run_id }}
+          restore-keys: |
+            forgewatch-state-${{ github.repository_id }}-
+
+      - name: Install the pinned scanners
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install ./forgewatch semgrep==1.177.0
+          mkdir -p "$RUNNER_TEMP/forgewatch-bin" "$RUNNER_TEMP/forgewatch-downloads"
+          cd "$RUNNER_TEMP/forgewatch-downloads"
+          curl --fail --location --silent --show-error --output osv-scanner https://github.com/google/osv-scanner/releases/download/v2.5.1/osv-scanner_linux_amd64
+          curl --fail --location --silent --show-error --output osv-checksums https://github.com/google/osv-scanner/releases/download/v2.5.1/osv-scanner_SHA256SUMS
+          grep 'osv-scanner_linux_amd64$' osv-checksums | sed 's/osv-scanner_linux_amd64/osv-scanner/' | sha256sum --check --strict
+          install -m 0755 osv-scanner "$RUNNER_TEMP/forgewatch-bin/osv-scanner"
+          curl --fail --location --silent --show-error --output gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          curl --fail --location --silent --show-error --output gitleaks-checksums https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_checksums.txt
+          grep 'gitleaks_8.30.1_linux_x64.tar.gz$' gitleaks-checksums | sed 's/gitleaks_8.30.1_linux_x64.tar.gz/gitleaks.tar.gz/' | sha256sum --check --strict
+          tar -xzf gitleaks.tar.gz gitleaks
+          install -m 0755 gitleaks "$RUNNER_TEMP/forgewatch-bin/gitleaks"
+          echo "$RUNNER_TEMP/forgewatch-bin" >> "$GITHUB_PATH"
+
+      - name: Bootstrap target dependencies without lifecycle scripts
+        shell: bash
+        working-directory: target
+        run: |
+          set -euo pipefail
+          if [[ -f package-lock.json ]]; then
+            npm ci --ignore-scripts
+          fi
+
+      - name: Scan and prepare supported fixes
+        id: scan
+        continue-on-error: true
+        shell: bash
+        run: |
+          forgewatch \
+            --root "$GITHUB_WORKSPACE/target" \
+            --config "$GITHUB_WORKSPACE/forgewatch/forgewatch.example.json" \
+            --repository "$TARGET_REPOSITORY" \
+            --default-branch "$TARGET_DEFAULT_BRANCH" \
+            scan \
+            --trigger "$SCAN_TRIGGER" \
+            --ref "$TARGET_REF" \
+            --report-dir ".forgewatch/artifacts/run-${GITHUB_RUN_ID}" \
+            --prepare-fixes \
+            --fail-on high
+
+      - name: Save finding history
+        if: always()
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: forgewatch/.forgewatch/state.db
+          key: forgewatch-state-${{ github.repository_id }}-${{ github.run_id }}
+
+      - name: Upload reports and patch candidates
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: forgewatch-${{ github.run_id }}
+          path: forgewatch/.forgewatch/artifacts/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Enforce scan result
+        if: steps.scan.outcome == 'failure'
+        shell: bash
+        run: exit 1

@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "repository": {
+    "slug": "1Kelv/sentinel",
+    "default_branch": "main"
+  },
+  "policy": {
+    "fix_generation": "automatic",
+    "require_merge_review": true,
+    "max_concurrent_fixes": 1
+  },
+  "scanners": {
+    "semgrep": {
+      "enabled": true,
+      "binary": "semgrep",
+      "config": "rules/semgrep.yml",
+      "timeout_seconds": 300
+    },
+    "osv": {
+      "enabled": true,
+      "binary": "osv-scanner",
+      "timeout_seconds": 300
+    },
+    "gitleaks": {
+      "enabled": true,
+      "binary": "gitleaks",
+      "history": false,
+      "timeout_seconds": 300
+    }
+  },
+  "execution": {
+    "isolation": "container",
+    "container_image": "node:20-bookworm",
+    "network": "none",
+    "timeout_seconds": 900,
+    "validation_commands": [
+      "npx tsc --noEmit -p tsconfig.app.json",
+      "npm run build"
+    ]
+  },
+  "ai": {
+    "provider": "openai",
+    "model": "gpt-5.6-terra",
+    "api_base": "https://api.openai.com/v1",
+    "max_output_tokens": 6000,
+    "max_requests_per_fix": 1
+  },
+  "github": {
+    "target_repositories": [
+      "1Kelv/sentinel"
+    ],
+    "automation_repository": "1Kelv/forgewatch",
+    "dispatch_event": "forgewatch_scan"
+  },
+  "state": {
+    "database": ".forgewatch/state.db",
+    "artifacts": ".forgewatch/artifacts"
+  }
+}
