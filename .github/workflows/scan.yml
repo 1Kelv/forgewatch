@@ -63,8 +63,22 @@ jobs:
           path: forgewatch
           persist-credentials: false
 
+      - name: Detect optional GitHub App credentials
+        id: app-config
+        shell: bash
+        env:
+          APP_ID: ${{ secrets.FORGEWATCH_APP_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.FORGEWATCH_APP_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$APP_ID" && -n "$APP_PRIVATE_KEY" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Mint a target-scoped GitHub App token
-        if: ${{ secrets.FORGEWATCH_APP_ID != '' && secrets.FORGEWATCH_APP_PRIVATE_KEY != '' }}
+        if: steps.app-config.outputs.configured == 'true'
         id: app-token
         uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
         with:
