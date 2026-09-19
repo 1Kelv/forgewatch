@@ -69,6 +69,7 @@ jobs:
         env:
           APP_ID: ${{ secrets.FORGEWATCH_APP_ID }}
           APP_PRIVATE_KEY: ${{ secrets.FORGEWATCH_APP_PRIVATE_KEY }}
+          TARGET_TOKEN: ${{ secrets.FORGEWATCH_TARGET_TOKEN }}
         run: |
           set -euo pipefail
           if [[ -n "$APP_ID" && -n "$APP_PRIVATE_KEY" ]]; then
@@ -76,6 +77,24 @@ jobs:
           else
             echo "configured=false" >> "$GITHUB_OUTPUT"
           fi
+          if [[ -n "$TARGET_TOKEN" ]]; then
+            echo "target_token_configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "target_token_configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Explain missing access to a private target
+        if: env.TARGET_REPOSITORY != github.repository && steps.app-config.outputs.configured != 'true' && steps.app-config.outputs.target_token_configured != 'true'
+        shell: bash
+        env:
+          PUBLIC_REPOSITORY_API: https://api.github.com/repos/${{ env.TARGET_REPOSITORY }}
+        run: |
+          set -euo pipefail
+          if curl --fail --silent --show-error --location "$PUBLIC_REPOSITORY_API" > /dev/null; then
+            exit 0
+          fi
+          echo "::error::Forgewatch cannot read ${TARGET_REPOSITORY}. The repository is private or does not exist. For a private target, install the Forgewatch GitHub App on that repository or add a read-only FORGEWATCH_TARGET_TOKEN secret to the 1Kelv/forgewatch repository."
+          exit 1
 
       - name: Mint a target-scoped GitHub App token
         if: steps.app-config.outputs.configured == 'true'

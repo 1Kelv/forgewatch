@@ -547,6 +547,8 @@ gh auth setup-git
 
 For the Forgewatch repository itself or a public target, no App secret is required. For a different private target, confirm either that the App is installed and its App ID and private-key secrets match, or that `FORGEWATCH_TARGET_TOKEN` contains a read-only fine-grained token with access to that repository. Also confirm the manual inputs use the correct owner and repository name.
 
+GitHub may say `repository not found` even when a private repository exists. This is how GitHub hides private repositories from credentials that cannot read them. The workflow checks for this situation before checkout and explains which credential is missing.
+
 ### Every scheduled GitHub scan is red
 
 Open the failed job and read the first error. `appId option is required` means the old workflow tried to use a GitHub App even though its secrets were absent. The repaired workflow skips that token step when no App is configured. Push the current changes to `main`, then run the workflow again.
