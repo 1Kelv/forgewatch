@@ -1,6 +1,6 @@
 # GitHub App setup and deployment
 
-Continuous monitoring is not active until every step below is completed and a signed test delivery plus workflow run are verified.
+The GitHub App is needed for webhook-triggered scans and for checking out a different private repository. It is not needed for a scheduled scan of Forgewatch itself or a public target. Do not call App-based monitoring active until every step below is completed and a signed test delivery plus workflow run are verified.
 
 ## 1. Create the Forgewatch repository
 
@@ -37,6 +37,8 @@ Forgewatch Actions repository secrets:
 
 - `FORGEWATCH_APP_ID`
 - `FORGEWATCH_APP_PRIVATE_KEY`
+
+As a simpler checkout-only alternative, a read-only fine-grained token for the private target can be stored as `FORGEWATCH_TARGET_TOKEN`. That token does not provide webhook dispatch or pull-request publication. Do not configure both approaches unless the fallback is intentional and documented.
 
 Webhook dispatcher secrets, stored in the host's secrets manager:
 

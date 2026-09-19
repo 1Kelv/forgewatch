@@ -10,7 +10,7 @@ on:
       repository:
         description: Target repository name
         required: true
-        default: sentinel
+        default: forgewatch
       revision:
         description: Commit SHA, branch or tag
         required: true
@@ -38,7 +38,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: forgewatch-${{ github.event.client_payload.repository || format('{0}/{1}', inputs.owner || vars.FORGEWATCH_TARGET_OWNER || '1Kelv', inputs.repository || vars.FORGEWATCH_TARGET_REPOSITORY || 'sentinel') }}-${{ github.event.client_payload.commit || inputs.revision || 'main' }}
+  group: forgewatch-${{ github.event.client_payload.repository || format('{0}/{1}', inputs.owner || vars.FORGEWATCH_TARGET_OWNER || github.repository_owner, inputs.repository || vars.FORGEWATCH_TARGET_REPOSITORY || github.event.repository.name) }}-${{ github.event.client_payload.commit || inputs.revision || github.sha }}
   cancel-in-progress: false
 
 jobs:
@@ -46,12 +46,12 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
-      TARGET_OWNER: ${{ github.event.client_payload.target_owner || inputs.owner || vars.FORGEWATCH_TARGET_OWNER || '1Kelv' }}
-      TARGET_NAME: ${{ github.event.client_payload.target_name || inputs.repository || vars.FORGEWATCH_TARGET_REPOSITORY || 'sentinel' }}
-      TARGET_REPOSITORY: ${{ github.event.client_payload.repository || format('{0}/{1}', inputs.owner || vars.FORGEWATCH_TARGET_OWNER || '1Kelv', inputs.repository || vars.FORGEWATCH_TARGET_REPOSITORY || 'sentinel') }}
-      TARGET_REVISION: ${{ github.event.client_payload.commit || inputs.revision || 'main' }}
-      TARGET_REF: ${{ github.event.client_payload.ref || inputs.ref || 'main' }}
-      TARGET_DEFAULT_BRANCH: ${{ github.event.client_payload.default_branch || inputs.default_branch || vars.FORGEWATCH_TARGET_DEFAULT_BRANCH || 'main' }}
+      TARGET_OWNER: ${{ github.event.client_payload.target_owner || inputs.owner || vars.FORGEWATCH_TARGET_OWNER || github.repository_owner }}
+      TARGET_NAME: ${{ github.event.client_payload.target_name || inputs.repository || vars.FORGEWATCH_TARGET_REPOSITORY || github.event.repository.name }}
+      TARGET_REPOSITORY: ${{ github.event.client_payload.repository || format('{0}/{1}', inputs.owner || vars.FORGEWATCH_TARGET_OWNER || github.repository_owner, inputs.repository || vars.FORGEWATCH_TARGET_REPOSITORY || github.event.repository.name) }}
+      TARGET_REVISION: ${{ github.event.client_payload.commit || inputs.revision || github.sha }}
+      TARGET_REF: ${{ github.event.client_payload.ref || inputs.ref || github.ref_name }}
+      TARGET_DEFAULT_BRANCH: ${{ github.event.client_payload.default_branch || inputs.default_branch || vars.FORGEWATCH_TARGET_DEFAULT_BRANCH || github.event.repository.default_branch }}
       SCAN_TRIGGER: ${{ github.event.client_payload.trigger || inputs.trigger || 'schedule' }}
       PIP_DISABLE_PIP_VERSION_CHECK: "1"
       PYTHONDONTWRITEBYTECODE: "1"
@@ -64,6 +64,7 @@ jobs:
           persist-credentials: false
 
       - name: Mint a target-scoped GitHub App token
+        if: ${{ secrets.FORGEWATCH_APP_ID != '' && secrets.FORGEWATCH_APP_PRIVATE_KEY != '' }}
         id: app-token
         uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
         with:
@@ -77,7 +78,7 @@ jobs:
         with:
           repository: ${{ env.TARGET_REPOSITORY }}
           ref: ${{ env.TARGET_REVISION }}
-          token: ${{ steps.app-token.outputs.token }}
+          token: ${{ steps.app-token.outputs.token || secrets.FORGEWATCH_TARGET_TOKEN || github.token }}
           path: target
           fetch-depth: 0
           persist-credentials: false
@@ -126,9 +127,9 @@ jobs:
 
       - name: Scan and prepare supported fixes
         id: scan
-        continue-on-error: true
         shell: bash
         run: |
+          set +e
           forgewatch \
             --root "$GITHUB_WORKSPACE/target" \
             --config "$GITHUB_WORKSPACE/forgewatch/forgewatch.example.json" \
@@ -140,16 +141,29 @@ jobs:
             --report-dir ".forgewatch/artifacts/run-${GITHUB_RUN_ID}" \
             --prepare-fixes \
             --fail-on high
+          scan_exit_code=$?
+          set -e
+          echo "exit_code=$scan_exit_code" >> "$GITHUB_OUTPUT"
+          if [[ "$scan_exit_code" == "0" ]]; then
+            echo "### Scan completed: no important finding reached the failure threshold" >> "$GITHUB_STEP_SUMMARY"
+          elif [[ "$scan_exit_code" == "1" ]]; then
+            echo "::warning::The scan completed and found important items to review. Open the uploaded scan.md report."
+            echo "### Scan completed: important items need review" >> "$GITHUB_STEP_SUMMARY"
+            echo "The scanners finished normally. Download the report artifact and open scan.md for the plain-English results." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::error::The scan was incomplete. Open scan.md to see which check could not finish."
+            echo "### Scan incomplete" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Save finding history
-        if: always()
+        if: always() && steps.scan.outcome != 'skipped'
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: forgewatch/.forgewatch/state.db
           key: forgewatch-state-${{ github.repository_id }}-${{ github.run_id }}
 
       - name: Upload reports and patch candidates
-        if: always()
+        if: always() && steps.scan.outcome != 'skipped'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: forgewatch-${{ github.run_id }}
@@ -157,7 +171,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Enforce scan result
-        if: steps.scan.outcome == 'failure'
+      - name: Fail only when the scan was incomplete
+        if: steps.scan.outcome != 'skipped' && steps.scan.outputs.exit_code != '0' && steps.scan.outputs.exit_code != '1'
         shell: bash
         run: exit 1

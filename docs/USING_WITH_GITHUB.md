@@ -19,6 +19,18 @@ forgewatch \
 
 Public repositories need no GitHub App permission for a local clone. Private repositories require the normal read permission of the person or service doing the clone.
 
+## Local dashboard
+
+Start the interface with:
+
+```sh
+cd /absolute/path/to/forgewatch
+. .venv/bin/activate
+forgewatch --config "$PWD/forgewatch.json" dashboard
+```
+
+Add the folder of any cloned Git repository, choose a frequency, and select `Run scan`. The dashboard shows the same plain-English results as `scan.md`. Manual, six-hourly, daily, and weekly frequencies are available. Local schedules run only while the dashboard process remains open.
+
 ## Automatic scans on GitHub
 
 The current hosted design works like this:
@@ -31,7 +43,7 @@ The current hosted design works like this:
 6. A developer reads `scan.md`, which leads with simple explanations and practical next steps. Technical scanner details remain available in a collapsed section.
 7. A supported fix can be prepared in a disposable workspace. It becomes eligible for a pull request only after every required check passes. A person must still review and merge it.
 
-There is no `npm run dev` step and no dashboard in this MVP. `forgewatch serve` starts only the webhook receiver. The actual scan runs through the Python command or GitHub Actions.
+There is no `npm run dev` step. `forgewatch dashboard` starts the local interface, while `forgewatch serve` starts only the webhook receiver. Scans can run through the dashboard, the Python command, or GitHub Actions.
 
 ## What another GitHub user can do today
 

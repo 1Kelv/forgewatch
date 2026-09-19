@@ -33,6 +33,7 @@ CHECK_NAMES = {
 CHECK_STATUS = {
     "passed": "Finished, with no matching problem",
     "findings": "Finished and found items to review",
+    "not_applicable": "Not applicable because no supported files were found",
     "failed": "Could not finish",
     "skipped": "Did not run",
 }

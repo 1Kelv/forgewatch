@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pervigil-forgewatch"
-version = "0.1.0"
+version = "0.2.0"
 description = "Forgewatch, Pervigil's standalone security scanning and human-approved remediation agent"
 requires-python = ">=3.9"
 license = { text = "Proprietary" }
@@ -16,3 +16,6 @@ forgewatch = "forgewatch.cli:main"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["forgewatch*"]
+
+[tool.setuptools.package-data]
+forgewatch = ["dashboard.html"]

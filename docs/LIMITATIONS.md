@@ -9,8 +9,8 @@
 - The Docker validator expects target dependencies to be preinstalled without lifecycle scripts. Native dependency differences between the host and container can block validation.
 - There is no general automated regression-test generator. The deterministic issue has a before-and-after security regression check and a real Semgrep rerun; AI may suggest tests, but they remain subject to scope and validation gates.
 - AI patch generation is implemented through the OpenAI Responses API but was not externally verified because no API credential was available.
-- GitHub App webhook dispatch, scheduled monitoring and pull-request publication are implemented and documented but are not active or externally verified because the App, standalone remote repository, secrets and hosted dispatcher do not yet exist.
-- Hosted operation currently uses an explicit repository allow-list and one configured dispatcher installation. There is no customer self-service installation, billing, tenant database or web dashboard yet.
+- GitHub App webhook dispatch and pull-request publication are implemented and documented but are not active until the App secrets and hosted dispatcher are configured. The GitHub Actions schedule can scan Forgewatch itself or a public repository without an App.
+- The dashboard is a single-user local interface bound to the current computer. It is not a hosted multi-customer dashboard and has no organisation sign-in, billing, or tenant database.
 - Reports are stored as artifacts in the Forgewatch Actions repository. A commercial multi-customer version needs GitHub Check results or a tenant-safe report link so an external repository owner does not need access to Pervigil's private automation repository.
 - Automatic PR publication must remain disabled for Sentinel while its repository instructions reserve commits and pushes for Kelvin.
 - Forgewatch does not merge, enable auto-merge, deploy, rotate credentials, rewrite Git history or modify production infrastructure.

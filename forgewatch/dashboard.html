@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="forgewatch-token" content="{{TOKEN}}">
+  <title>Forgewatch</title>
+  <style nonce="{{NONCE}}">
+    :root {
+      color-scheme: dark;
+      --ink: #f3f4f6;
+      --muted: #9ba6b2;
+      --panel: #151c24;
+      --panel-2: #10161d;
+      --line: #2b3744;
+      --accent: #e2a94b;
+      --accent-strong: #ffc664;
+      --good: #64c29a;
+      --bad: #f07878;
+      --warn: #e2a94b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at 80% -10%, #243140 0, #0c1117 38%, #090d12 100%);
+      color: var(--ink);
+      font: 15px/1.5 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    button, input, select { font: inherit; }
+    button, select { cursor: pointer; }
+    .shell { width: min(1180px, calc(100% - 36px)); margin: 0 auto; padding: 34px 0 70px; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 28px; }
+    .brand { display: flex; align-items: center; gap: 14px; }
+    .mark { width: 40px; height: 40px; border: 1px solid #806637; transform: rotate(45deg); display: grid; place-items: center; background: #1d1b17; }
+    .mark::after { content: "F"; transform: rotate(-45deg); color: var(--accent-strong); font-weight: 800; font-size: 19px; }
+    h1 { margin: 0; font-size: 24px; letter-spacing: -.02em; }
+    h2 { margin: 0; font-size: 19px; }
+    h3 { margin: 0; font-size: 17px; }
+    p { margin: 0; }
+    .muted { color: var(--muted); }
+    .scanner-strip { display: flex; flex-wrap: wrap; gap: 9px; justify-content: flex-end; }
+    .scanner { padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: #111820; }
+    .scanner.ready::before { content: ""; width: 7px; height: 7px; display: inline-block; margin-right: 7px; border-radius: 50%; background: var(--good); }
+    .scanner.missing::before { content: ""; width: 7px; height: 7px; display: inline-block; margin-right: 7px; border-radius: 50%; background: var(--bad); }
+    .hero { display: grid; grid-template-columns: 1.35fr .65fr; gap: 16px; margin-bottom: 18px; }
+    .panel { border: 1px solid var(--line); border-radius: 15px; background: linear-gradient(150deg, rgba(24,33,43,.96), rgba(15,21,28,.96)); box-shadow: 0 18px 50px rgba(0,0,0,.2); }
+    .intro { padding: 27px; }
+    .eyebrow { color: var(--accent-strong); text-transform: uppercase; letter-spacing: .13em; font-size: 12px; font-weight: 750; margin-bottom: 9px; }
+    .intro h2 { font-size: clamp(25px, 4vw, 38px); line-height: 1.12; max-width: 680px; margin-bottom: 13px; letter-spacing: -.035em; }
+    .intro .muted { max-width: 720px; font-size: 16px; }
+    .schedule-note { padding: 27px; display: flex; flex-direction: column; justify-content: center; gap: 8px; }
+    .schedule-note strong { color: var(--accent-strong); }
+    .add-panel { padding: 22px; margin-bottom: 27px; }
+    .section-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 18px; margin-bottom: 17px; }
+    .form-grid { display: grid; grid-template-columns: 1.7fr 1fr .7fr .8fr auto; gap: 10px; align-items: end; }
+    label { display: grid; gap: 7px; color: var(--muted); font-size: 13px; font-weight: 650; }
+    input, select {
+      width: 100%; min-height: 43px; border: 1px solid #344253; border-radius: 9px; padding: 9px 11px;
+      background: #0d131a; color: var(--ink); outline: none;
+    }
+    input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(226,169,75,.14); }
+    button { min-height: 43px; border: 1px solid #3b4857; border-radius: 9px; padding: 9px 14px; background: #1d2732; color: var(--ink); font-weight: 700; }
+    button:hover { border-color: #6c7a89; background: #25313e; }
+    button.primary { border-color: #bc8533; background: var(--accent); color: #181107; }
+    button.primary:hover { background: var(--accent-strong); }
+    button.danger { color: #f5a0a0; }
+    button:disabled { opacity: .5; cursor: wait; }
+    .error { min-height: 24px; color: #ff9b9b; margin-top: 10px; }
+    .repository-list { display: grid; gap: 13px; }
+    .empty { padding: 48px 24px; text-align: center; border: 1px dashed #384554; border-radius: 14px; color: var(--muted); }
+    .repo { padding: 21px; display: grid; grid-template-columns: 1fr auto; gap: 18px; }
+    .repo-top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 9px; }
+    .status { padding: 3px 9px; border-radius: 999px; background: #26313d; color: #c3ccd5; font-size: 12px; font-weight: 750; }
+    .status.clean, .status.finished { background: rgba(100,194,154,.14); color: #8ce0bb; }
+    .status.findings, .status.error { background: rgba(240,120,120,.14); color: #ffaaaa; }
+    .status.incomplete, .status.running, .status.queued { background: rgba(226,169,75,.14); color: #f0c576; }
+    .path { margin: 3px 0 13px; color: #7f8b97; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
+    .summary { color: #d0d6dc; }
+    .repo-actions { min-width: 245px; display: grid; grid-template-columns: 1fr 1fr; gap: 9px; align-content: start; }
+    .repo-actions label { grid-column: 1 / -1; }
+    .repo-actions .remove { grid-column: 1 / -1; min-height: 34px; padding: 5px 10px; background: transparent; border-color: transparent; }
+    dialog { width: min(820px, calc(100% - 28px)); max-height: 84vh; border: 1px solid #3a4756; border-radius: 15px; padding: 0; background: #10161d; color: var(--ink); box-shadow: 0 30px 100px #000; }
+    dialog::backdrop { background: rgba(2,5,8,.78); backdrop-filter: blur(3px); }
+    .dialog-head { position: sticky; top: 0; display: flex; justify-content: space-between; gap: 16px; align-items: start; padding: 22px; background: #151d26; border-bottom: 1px solid var(--line); }
+    .dialog-body { padding: 22px; }
+    .dialog-body > p { margin: 8px 0; }
+    .check-grid { display: grid; gap: 8px; margin: 20px 0; }
+    .check { padding: 11px 13px; border: 1px solid var(--line); border-radius: 9px; }
+    .finding { padding: 17px; margin: 11px 0; border: 1px solid var(--line); border-left: 3px solid var(--warn); border-radius: 9px; background: #131b23; }
+    .finding h3 { margin-bottom: 9px; }
+    .finding p { margin: 7px 0; }
+    .kicker { color: var(--accent-strong); font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+    code { color: #c6d4e2; overflow-wrap: anywhere; }
+    @media (max-width: 900px) {
+      .hero { grid-template-columns: 1fr; }
+      .form-grid { grid-template-columns: 1fr 1fr; }
+      .form-grid label:first-child { grid-column: 1 / -1; }
+      .form-grid button { align-self: end; }
+    }
+    @media (max-width: 650px) {
+      .shell { width: min(100% - 22px, 1180px); padding-top: 20px; }
+      header, .section-head { align-items: flex-start; flex-direction: column; }
+      .scanner-strip { justify-content: flex-start; }
+      .form-grid { grid-template-columns: 1fr; }
+      .form-grid label:first-child { grid-column: auto; }
+      .repo { grid-template-columns: 1fr; }
+      .repo-actions { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div class="brand"><div class="mark" aria-hidden="true"></div><div><h1>Forgewatch</h1><p class="muted">Repository security dashboard</p></div></div>
+      <div id="scanners" class="scanner-strip" aria-label="Scanner availability"></div>
+    </header>
+
+    <section class="hero">
+      <div class="panel intro">
+        <p class="eyebrow">Plain-English security checks</p>
+        <h2>Choose a repository. Scan it. Understand what needs attention.</h2>
+        <p class="muted">Forgewatch checks code, dependency versions, and possible exposed secrets. It explains results without assuming specialist security knowledge.</p>
+      </div>
+      <div class="panel schedule-note">
+        <strong>Local schedules</strong>
+        <p class="muted">Scheduled scans run while this dashboard server remains open. GitHub Actions schedules continue separately in GitHub.</p>
+      </div>
+    </section>
+
+    <section class="panel add-panel">
+      <div class="section-head"><div><h2>Add a repository</h2><p class="muted">Use the folder of any Git repository already on this computer.</p></div></div>
+      <form id="add-form" class="form-grid">
+        <label>Repository folder<input name="path" required placeholder="/Users/you/Documents/project"></label>
+        <label>Name, optional<input name="slug" placeholder="owner/repository"></label>
+        <label>Default branch<input name="default_branch" placeholder="main"></label>
+        <label>Scan frequency<select name="frequency"></select></label>
+        <button class="primary" type="submit">Add repository</button>
+      </form>
+      <p id="form-error" class="error" role="alert"></p>
+    </section>
+
+    <div class="section-head"><div><h2>Repositories</h2><p id="repo-count" class="muted">Loading repositories</p></div><button id="refresh" type="button">Refresh</button></div>
+    <section id="repositories" class="repository-list" aria-live="polite"></section>
+  </main>
+
+  <dialog id="report-dialog">
+    <div class="dialog-head"><div><p class="eyebrow">Latest scan</p><h2 id="report-title">Report</h2></div><button id="close-report" type="button">Close</button></div>
+    <div id="report-body" class="dialog-body"></div>
+  </dialog>
+
+  <script nonce="{{NONCE}}">
+    const token = document.querySelector('meta[name="forgewatch-token"]').content;
+    const repositories = document.getElementById('repositories');
+    const frequencyInput = document.querySelector('#add-form [name="frequency"]');
+    const formError = document.getElementById('form-error');
+    let state = { repositories: [], frequencies: {}, scanners: {} };
+    let pollTimer;
+
+    const escapeHtml = (value) => String(value ?? '').replace(/[&<>"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[char]));
+    const shortSha = value => value ? value.slice(0, 8) : 'not available';
+    const dateText = value => value ? new Date(value).toLocaleString() : 'Not run yet';
+    const nextText = value => value ? new Date(value * 1000).toLocaleString() : 'Manual only';
+
+    async function api(path, options = {}) {
+      const response = await fetch(path, {
+        ...options,
+        headers: {'Content-Type': 'application/json', 'X-Forgewatch-Token': token, ...(options.headers || {})},
+        body: options.body ? JSON.stringify(options.body) : undefined
+      });
+      const value = await response.json();
+      if (!response.ok) throw new Error(value.error || 'The request failed.');
+      return value;
+    }
+
+    function frequencyOptions(selected) {
+      return Object.entries(state.frequencies).map(([key, value]) => `<option value="${escapeHtml(key)}" ${key === selected ? 'selected' : ''}>${escapeHtml(value.label)}</option>`).join('');
+    }
+
+    function renderScanners() {
+      document.getElementById('scanners').innerHTML = Object.entries(state.scanners).map(([name, ready]) =>
+        `<span class="scanner ${ready ? 'ready' : 'missing'}">${escapeHtml(name)} ${ready ? 'ready' : 'missing'}</span>`
+      ).join('');
+    }
+
+    function renderRepositories() {
+      document.getElementById('repo-count').textContent = `${state.repositories.length} ${state.repositories.length === 1 ? 'repository' : 'repositories'} configured`;
+      if (!state.repositories.length) {
+        repositories.innerHTML = '<div class="empty">No repositories added yet. Add a repository folder above to run the first scan.</div>';
+        return;
+      }
+      repositories.innerHTML = state.repositories.map(repo => {
+        const last = repo.last_scan;
+        const job = repo.job || {status: 'idle'};
+        const busy = ['queued', 'running'].includes(job.status);
+        const status = busy ? job.status : (last?.status || 'idle');
+        const headline = busy ? (job.status === 'queued' ? 'Waiting to start' : 'Scanning now') : (last?.headline || 'Ready for the first scan');
+        const details = last ? `${last.finding_count || 0} items recorded · ${dateText(last.finished_at)} · commit ${shortSha(last.commit_sha)}` : 'No report has been created yet.';
+        const error = job.status === 'error' ? `<p class="error">${escapeHtml(job.error)}</p>` : '';
+        return `<article class="panel repo" data-id="${repo.id}">
+          <div>
+            <div class="repo-top"><h3>${escapeHtml(repo.slug)}</h3><span class="status ${escapeHtml(status)}">${escapeHtml(status)}</span></div>
+            <p class="summary">${escapeHtml(headline)}</p>
+            <p class="muted">${escapeHtml(details)}</p>
+            ${error}
+            <p class="path">${escapeHtml(repo.path)} · branch ${escapeHtml(repo.default_branch)}</p>
+            <p class="muted">Next scan: ${escapeHtml(nextText(repo.next_scan_at))}</p>
+          </div>
+          <div class="repo-actions">
+            <label>Scan frequency<select data-action="frequency" ${busy ? 'disabled' : ''}>${frequencyOptions(repo.frequency)}</select></label>
+            <button class="primary" data-action="scan" ${busy ? 'disabled' : ''}>${busy ? 'Scanning' : 'Run scan'}</button>
+            <button data-action="report" ${repo.latest_report ? '' : 'disabled'}>View report</button>
+            <button class="danger remove" data-action="remove" ${busy ? 'disabled' : ''}>Remove from dashboard</button>
+          </div>
+        </article>`;
+      }).join('');
+    }
+
+    async function load() {
+      try {
+        state = await api('/api/state');
+        frequencyInput.innerHTML = frequencyOptions(frequencyInput.value || 'manual');
+        renderScanners();
+        renderRepositories();
+        const busy = state.repositories.some(repo => ['queued', 'running'].includes(repo.job?.status));
+        clearTimeout(pollTimer);
+        pollTimer = setTimeout(load, busy ? 1800 : 12000);
+      } catch (error) {
+        repositories.innerHTML = `<div class="empty error">${escapeHtml(error.message)}</div>`;
+      }
+    }
+
+    document.getElementById('add-form').addEventListener('submit', async event => {
+      event.preventDefault();
+      formError.textContent = '';
+      const form = event.currentTarget;
+      const button = form.querySelector('button');
+      button.disabled = true;
+      const values = Object.fromEntries(new FormData(form));
+      try {
+        await api('/api/repositories', {method: 'POST', body: values});
+        form.reset();
+        await load();
+      } catch (error) {
+        formError.textContent = error.message;
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    repositories.addEventListener('change', async event => {
+      if (event.target.dataset.action !== 'frequency') return;
+      const card = event.target.closest('[data-id]');
+      try {
+        await api(`/api/repositories/${card.dataset.id}`, {method: 'PATCH', body: {frequency: event.target.value}});
+        await load();
+      } catch (error) {
+        formError.textContent = error.message;
+        await load();
+      }
+    });
+
+    repositories.addEventListener('click', async event => {
+      const button = event.target.closest('button[data-action]');
+      if (!button) return;
+      const card = button.closest('[data-id]');
+      const id = card.dataset.id;
+      button.disabled = true;
+      try {
+        if (button.dataset.action === 'scan') await api(`/api/repositories/${id}/scan`, {method: 'POST', body: {}});
+        if (button.dataset.action === 'remove') {
+          if (!confirm('Remove this repository from the dashboard? Existing report files will remain on disk.')) return;
+          await api(`/api/repositories/${id}`, {method: 'DELETE', body: {}});
+        }
+        if (button.dataset.action === 'report') await showReport(id);
+        await load();
+      } catch (error) {
+        formError.textContent = error.message;
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    async function showReport(id) {
+      const report = await api(`/api/repositories/${id}/report`);
+      document.getElementById('report-title').textContent = report.headline;
+      const checks = report.checks.map(check => `<div class="check"><strong>${escapeHtml(check.name)}</strong><br><span class="muted">${escapeHtml(check.status)}</span>${check.error ? `<p class="error">${escapeHtml(check.error)}</p>` : ''}</div>`).join('');
+      const findings = report.findings.length ? report.findings.map(finding => `<article class="finding"><p class="kicker">${escapeHtml(finding.priority)}</p><h3>${escapeHtml(finding.title)}</h3><p><strong>Where:</strong> <code>${escapeHtml(finding.where)}</code></p><p><strong>Why this matters:</strong> ${escapeHtml(finding.why_it_matters)}</p><p><strong>What to do:</strong> ${escapeHtml(finding.what_to_do)}</p></article>`).join('') : '<div class="empty">No items were recorded by the checks that finished.</div>';
+      document.getElementById('report-body').innerHTML = `<p>${escapeHtml(report.summary)}</p><p class="muted">${escapeHtml(report.next_step)}</p><p class="path">Commit ${escapeHtml(report.commit_sha)} · ${escapeHtml(dateText(report.finished_at))}</p><h3>Checks</h3><div class="check-grid">${checks}</div><h3>Items to review</h3>${findings}<p class="path">Full report files: ${escapeHtml(report.report_directory)}</p>`;
+      document.getElementById('report-dialog').showModal();
+    }
+
+    document.getElementById('close-report').addEventListener('click', () => document.getElementById('report-dialog').close());
+    document.getElementById('refresh').addEventListener('click', load);
+    load();
+  </script>
+</body>
+</html>

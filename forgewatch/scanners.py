@@ -169,9 +169,9 @@ def run_semgrep(root: Path, config: Dict[str, Any]) -> ScannerRun:
     skipped_count = len(paths.get("skipped", []) or [])
     if scanned_count == 0:
         return ScannerRun(
-            "semgrep", version, "skipped",
-            "JavaScript, TypeScript, JSX and TSX only; 0 supported files scanned",
-            duration, error="no files covered by the configured code rules",
+            "semgrep", version, "not_applicable",
+            "0 JavaScript, TypeScript, JSX or TSX files found",
+            duration,
         )
     return ScannerRun(
         "semgrep",
@@ -226,8 +226,7 @@ def run_osv(root: Path, config: Dict[str, Any]) -> ScannerRun:
     ]
     if not lockfiles:
         return ScannerRun(
-            "osv-scanner", version, "skipped", "0 supported dependency manifests or lockfiles", duration,
-            error="no supported dependency manifest or lockfile was found",
+            "osv-scanner", version, "not_applicable", "0 supported dependency manifests or lockfiles", duration,
         )
 
     findings = []

@@ -8,10 +8,11 @@ The first configured target is `1Kelv/sentinel`, but Forgewatch is a separate Gi
 
 ## Current status
 
-This repository contains a working MVP, not an active hosted service.
+This repository contains a working local MVP and GitHub Actions automation, not a public hosted service.
 
+- The local dashboard can register repositories, run scans, show plain-English reports, and schedule recurring local scans.
 - Local scanning and the deliberately vulnerable demonstration fixture are working.
-- The GitHub Actions workflows are ready but are not active until this project is pushed to GitHub.
+- The GitHub Actions test and scan workflows are included. A scan of Forgewatch itself or another public repository does not require a GitHub App.
 - GitHub App webhook handling is implemented but is not active until an App, secrets, and an HTTPS host are configured.
 - AI patch generation is implemented but has not been called because no API credential was provided.
 - Containerised application testing reports `blocked` when Docker is unavailable. It never falls back to running untrusted repository code directly on the host.
@@ -37,7 +38,7 @@ Forgewatch treats repository files, filenames, commit messages, webhook data, sc
 - Repository test and build commands run only in Docker with no network, dropped capabilities, a read-only container filesystem, and resource limits.
 - Each proposed fix is restricted to the files connected to its finding.
 - Patches containing common rule-suppression or test-weakening markers are rejected.
-- A failed or skipped scanner makes the whole scan incomplete, never clean.
+- A failed, disabled, or unexpectedly skipped scanner makes the whole scan incomplete, never clean. A check with no applicable file type is reported separately as not applicable.
 - GitHub write credentials remain in the controller and are never passed into repository code execution.
 - A proposed pull request is rejected if validation is blocked or failed, or if the default branch changed after the patch was prepared.
 
@@ -79,7 +80,7 @@ security_rescan: passed
 
 If Docker is not installed, `isolated_validation` will say `blocked`. That is the intended safe behaviour. The report and candidate patch are still written under `.forgewatch/artifacts/demo-fixture/`, but the patch is not eligible for automatic pull-request publication.
 
-There is no `npm run dev` command. Forgewatch is a Python CLI. The `forgewatch serve` command starts only the GitHub webhook receiver; it does not start a dashboard.
+There is no `npm run dev` command. Forgewatch is a Python application. Use `forgewatch dashboard` for the local interface. The separate `forgewatch serve` command starts only the GitHub webhook receiver.
 
 ## Fresh local installation
 
@@ -106,6 +107,32 @@ gitleaks version
 - [Gitleaks releases](https://github.com/gitleaks/gitleaks/releases/tag/v8.30.1)
 
 The GitHub Actions workflows download these binaries and verify their published SHA-256 checksums automatically.
+
+## Use the dashboard
+
+Start the interface from the Forgewatch folder:
+
+```sh
+cd /Users/kelvinolasupo/Documents/Codex/forgewatch
+. .venv/bin/activate
+python -m pip install -e .
+forgewatch --config "$PWD/forgewatch.json" dashboard
+```
+
+The browser opens `http://127.0.0.1:8790`. Keep the terminal window open while using the dashboard.
+
+To scan a repository:
+
+1. Select `Add a repository`.
+2. Enter the full folder path of a Git repository already cloned onto the computer.
+3. Optionally enter a display name such as `1Kelv/sentinel` and its default branch.
+4. Choose `Manual only`, `Every 6 hours`, `Every day`, or `Every week`.
+5. Select `Add repository`, then `Run scan`.
+6. When it finishes, select `View report`.
+
+The dashboard remembers repository choices in `.forgewatch/dashboard.json`. Reports are written under `.forgewatch/artifacts/dashboard/`. Both locations are ignored by Git and remain outside every target repository.
+
+Local recurring scans run only while the dashboard server is open. GitHub Actions schedules run independently in GitHub and are the better choice for always-on monitoring.
 
 ## Scan any local repository
 
@@ -275,19 +302,9 @@ python scripts/demo.py
 
 The demonstration must show that the focused security test fails before the fix, passes afterwards, and that Semgrep no longer detects the original finding in the fixed workspace.
 
-## Kelvin's exact commit and first GitHub push
+## Kelvin's exact commit and push commands
 
-The project is currently on `codex/forgewatch-mvp` and has no commit or remote. The following creates the commit yourself, creates a private `1Kelv/forgewatch` repository, establishes `main`, and also publishes the implementation branch.
-
-Authenticate the GitHub CLI first because the currently saved token may have expired:
-
-```sh
-gh auth login -h github.com -p https -w
-gh auth status
-gh auth setup-git
-```
-
-Review and create the commit:
+The GitHub repository already exists. Review and commit the workflow repair and dashboard yourself:
 
 ```sh
 cd /Users/kelvinolasupo/Documents/Codex/forgewatch
@@ -295,10 +312,12 @@ cd /Users/kelvinolasupo/Documents/Codex/forgewatch
 git config user.name
 git config user.email
 git status --short --branch
-git add .github .gitignore README.md docs fixtures forgewatch.example.json forgewatch pyproject.toml rules scripts tests
+git add .github README.md docs forgewatch pyproject.toml tests
 git diff --cached --check
 git diff --cached --stat
-git commit -m "feat: add standalone Forgewatch security agent MVP"
+git commit -m "feat: add dashboard and repair scheduled scans"
+git push origin HEAD:main
+git push origin HEAD:codex/forgewatch-mvp
 ```
 
 If either Git identity command prints nothing, set repository-local values before committing:
@@ -308,29 +327,11 @@ git config user.name "YOUR NAME"
 git config user.email "YOUR VERIFIED GITHUB EMAIL"
 ```
 
-Create the private GitHub repository without pushing automatically, then push `main` first so it becomes the initial default branch:
-
-```sh
-gh repo create 1Kelv/forgewatch \
-  --private \
-  --source=. \
-  --remote=origin \
-  --description "Standalone repository security scanning and human-reviewed remediation for Pervigil"
-
-git branch main codex/forgewatch-mvp
-git push -u origin main
-git push -u origin codex/forgewatch-mvp
-gh repo edit 1Kelv/forgewatch --default-branch main
-git remote -v
-```
-
-Do not add `--public` unless the proprietary licence and release plan have been deliberately reviewed.
-
 These commands do not modify or push Sentinel.
 
-## Test the first GitHub push
+## Test the GitHub push
 
-The `Forgewatch tests` workflow needs no App secrets. It runs on the first push to `main` and the implementation branch. It executes the unit tests, builds the Python wheel, runs all three real scanners against the vulnerable fixture, and uploads the demonstration report and patch.
+The `Forgewatch tests` workflow needs no App secrets. It runs on pushes to `main` and the implementation branch. It executes the unit tests, builds the Python wheel, runs all three real scanners against the vulnerable fixture, and uploads the demonstration report and patch.
 
 List the runs:
 
@@ -360,7 +361,9 @@ Open `downloaded-test-artifact/scan.md` and confirm it is the plain-English repo
 
 ## Configure automatic GitHub scans
 
-The test workflow proves Forgewatch itself works. Scanning Sentinel on pushes, pull requests, and a schedule requires the GitHub App.
+The test workflow proves Forgewatch itself works. The scan workflow can scan Forgewatch itself and public repositories without App secrets. Scanning a different private repository such as Sentinel requires a GitHub App installation or a read-only fine-grained token stored as the `FORGEWATCH_TARGET_TOKEN` Actions secret.
+
+With no target variables configured, the daily schedule scans the Forgewatch repository itself. Set the target variables below only after credentials for the private target are ready.
 
 ### 1. Register the App
 
@@ -443,7 +446,7 @@ gh run list \
 gh run watch RUN_ID --repo 1Kelv/forgewatch --exit-status
 ```
 
-The workflow intentionally exits with failure when a finding reaches its configured threshold. That does not mean the scanner crashed. Download the artifact and inspect `scan.md`; `scan.json` distinguishes `findings` from `incomplete`.
+The workflow now treats a completed scan with findings as a successful run with a warning. It uploads the report so the findings can be reviewed. A red workflow means the scan was incomplete or another operational step failed. Download the artifact and inspect `scan.md`; `scan.json` distinguishes `findings` from `incomplete`.
 
 ### 4. Start the webhook receiver
 
@@ -486,10 +489,11 @@ Monitoring is not active until those checks pass in GitHub.
 
 ## How another repository owner tries Forgewatch
 
-For the internal MVP, another owner has two options:
+For the internal MVP, another owner has three options:
 
-1. Self-host: clone or fork Forgewatch, create their own GitHub App, install it only on selected repositories, configure the allow-list and secrets, and run the same workflows.
-2. Manual Pervigil onboarding: install Pervigil's App on selected repositories, then have Pervigil add the full `OWNER/REPOSITORY` name to the server allow-list and scheduled-target configuration.
+1. Local use: clone Forgewatch, clone any repository they are allowed to read, add its folder in the dashboard, and run a manual or recurring local scan.
+2. Self-host: clone or fork Forgewatch, create their own GitHub App, install it only on selected repositories, configure the allow-list and secrets, and run the same workflows.
+3. Manual Pervigil onboarding: install Pervigil's App on selected repositories, then have Pervigil add the full `OWNER/REPOSITORY` name to the server allow-list and scheduled-target configuration.
 
 After onboarding, their normal workflow is simple:
 
@@ -541,7 +545,13 @@ gh auth setup-git
 
 ### The GitHub scan workflow cannot check out the target
 
-Confirm the App is installed on that repository and that the manual inputs use the correct owner and repository name. Confirm the private key and App ID secrets belong to the same App.
+For the Forgewatch repository itself or a public target, no App secret is required. For a different private target, confirm either that the App is installed and its App ID and private-key secrets match, or that `FORGEWATCH_TARGET_TOKEN` contains a read-only fine-grained token with access to that repository. Also confirm the manual inputs use the correct owner and repository name.
+
+### Every scheduled GitHub scan is red
+
+Open the failed job and read the first error. `appId option is required` means the old workflow tried to use a GitHub App even though its secrets were absent. The repaired workflow skips that token step when no App is configured. Push the current changes to `main`, then run the workflow again.
+
+After this repair, completed scans with findings are shown as successful runs with warnings and an uploaded report. Red is reserved for incomplete scans and operational failures.
 
 ## Documentation
 

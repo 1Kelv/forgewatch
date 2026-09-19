@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .approvals import issue
+from .dashboard import serve_dashboard
 from .engine import git_sha, scan, utc_now, verified_default_branch
 from .github import publish_pull_request
 from .models import SEVERITY_ORDER
@@ -157,6 +158,18 @@ def command_serve(config: Dict[str, Any], store: Store, args: argparse.Namespace
     return 0
 
 
+def command_dashboard(config: Dict[str, Any], store: Store, args: argparse.Namespace) -> int:
+    serve_dashboard(
+        config,
+        store,
+        host=args.host,
+        port=args.port,
+        state_file=args.state_file,
+        open_browser=not args.no_open,
+    )
+    return 0
+
+
 def parser() -> argparse.ArgumentParser:
     value = argparse.ArgumentParser(prog="forgewatch", description="Scan, track and prepare reviewable security fixes.")
     value.add_argument("--root", default=".", help="repository checkout")
@@ -203,6 +216,11 @@ def parser() -> argparse.ArgumentParser:
     serve_parser = commands.add_parser("serve")
     serve_parser.add_argument("--host", default="127.0.0.1")
     serve_parser.add_argument("--port", type=int, default=8787)
+    dashboard_parser = commands.add_parser("dashboard", help="open the local Forgewatch dashboard")
+    dashboard_parser.add_argument("--host", default="127.0.0.1")
+    dashboard_parser.add_argument("--port", type=int, default=8790)
+    dashboard_parser.add_argument("--state-file", default=".forgewatch/dashboard.json")
+    dashboard_parser.add_argument("--no-open", action="store_true", help="do not open a browser automatically")
     return value
 
 
@@ -233,6 +251,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                 return command_webhook(store, args)
             if args.command == "serve":
                 return command_serve(config, store, args)
+            if args.command == "dashboard":
+                return command_dashboard(config, store, args)
             raise ValueError(f"unknown command: {args.command}")
         finally:
             store.close()
