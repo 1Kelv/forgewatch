@@ -42,7 +42,7 @@ Budget guardrails should include GitHub Actions spending limits, alerting on dis
 
 ## Scanner upgrades
 
-Upgrade one scanner at a time. Verify its licence, release notes, JSON schema and exit codes. Update the version in the workflow, rerun parser fixtures and unit tests, run the deliberately vulnerable fixture, then scan Sentinel. A scanner upgrade that cannot produce a version or parseable output is a failed run.
+Upgrade one scanner at a time. Verify its licence, release notes, JSON schema and exit codes. Update the version in the workflow, rerun parser fixtures and unit tests, run the deliberately vulnerable fixture, then scan a representative private target. A scanner upgrade that cannot produce a version or parseable output is a failed run.
 
 ## Incident handling for a secret finding
 

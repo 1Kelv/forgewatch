@@ -221,7 +221,7 @@ export function Dashboard({ appSlug }: { appSlug: string }) {
       <main className="shell landing">
         <nav className="nav">
           <a className="brand" href="/" aria-label="Forgewatch home"><span className="brandMark">F</span><span>Forgewatch</span></a>
-          <span className="productTag">Pervigil security</span>
+          <span className="productTag">Repository security</span>
         </nav>
         <section className="hero">
           <p className="eyebrow">Repository security, explained clearly</p>

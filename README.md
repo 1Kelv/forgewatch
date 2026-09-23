@@ -1,10 +1,10 @@
 # Forgewatch
 
-Forgewatch is Pervigil's standalone repository security agent. It scans a Git checkout, explains what needs attention in plain English, remembers findings between scans, prepares narrow fixes in disposable workspaces, and can hand a validated patch to a human through a pull request.
+Forgewatch is a standalone repository security agent. It scans a Git checkout, explains what needs attention in plain English, remembers findings between scans, prepares narrow fixes in disposable workspaces, and can hand a validated patch to a human through a pull request.
 
 Forgewatch never merges, enables auto-merge, deploys, rotates credentials, or changes production infrastructure.
 
-The first configured target is `1Kelv/sentinel`, but Forgewatch is a separate Git repository and runtime. Nothing needs to be added to Sentinel or to another repository being scanned.
+Forgewatch is independent from every repository it scans. It can scan any authorised private or public repository without becoming part of that project's codebase.
 
 ## Current status
 
@@ -126,7 +126,7 @@ To scan a repository:
 
 1. Select `Add a repository`.
 2. Enter the full folder path of a Git repository already cloned onto the computer.
-3. Optionally enter a display name such as `1Kelv/sentinel` and its default branch.
+3. Optionally enter a display name such as `OWNER/REPOSITORY` and its default branch.
 4. Choose `Manual only`, `Every 6 hours`, `Every day`, or `Every week`.
 5. Select `Add repository`, then `Run scan`.
 6. When it finishes, select `View report`.
@@ -334,7 +334,7 @@ git config user.name "YOUR NAME"
 git config user.email "YOUR VERIFIED GITHUB EMAIL"
 ```
 
-These commands do not modify or push Sentinel.
+These commands do not modify or push the target repository.
 
 ## Test the GitHub push
 
@@ -368,7 +368,7 @@ Open `downloaded-test-artifact/scan.md` and confirm it is the plain-English repo
 
 ## Configure automatic GitHub scans
 
-The test workflow proves Forgewatch itself works. The scan workflow can scan Forgewatch itself and public repositories without App secrets. Scanning a different private repository such as Sentinel requires a GitHub App installation or a read-only fine-grained token stored as the `FORGEWATCH_TARGET_TOKEN` Actions secret.
+The test workflow proves Forgewatch itself works. The scan workflow can scan Forgewatch itself and public repositories without App secrets. Scanning a different private repository requires a GitHub App installation or a read-only fine-grained token stored as the `FORGEWATCH_TARGET_TOKEN` Actions secret.
 
 With no target variables configured, the daily schedule scans the Forgewatch repository itself. Set the target variables below only after credentials for the private target are ready.
 
@@ -379,7 +379,7 @@ In GitHub, open `Settings`, `Developer settings`, `GitHub Apps`, then `New GitHu
 Use:
 
 - Name: a globally unique variation of `Forgewatch`.
-- Homepage URL: `https://pervigil.co.uk`.
+- Homepage URL: the deployed Forgewatch dashboard URL.
 - Webhook URL: `https://YOUR_HTTPS_HOST/github/webhook`.
 - Webhook secret: a new high-entropy value stored outside source control.
 - SSL verification: enabled.
@@ -392,7 +392,7 @@ Repository permissions for the single-App MVP:
 - Pull requests: read and write for pull-request events and optional reviewed fix pull requests.
 - Actions: read and write when the hosted controller starts and inspects workflow runs.
 
-Subscribe to `push` and `pull_request` events. Select the minimum permissions required and install the App only on `forgewatch` and `sentinel`.
+Subscribe to `push` and `pull_request` events. Select the minimum permissions required and install the App only on `forgewatch` and repositories whose owners have approved scanning.
 
 For stronger production separation, use a read-only scanning App and a separate publisher App with write permission. The MVP supports one App, but never passes its token into target code execution.
 
@@ -421,7 +421,7 @@ gh variable set FORGEWATCH_TARGET_OWNER \
 
 gh variable set FORGEWATCH_TARGET_REPOSITORY \
   --repo 1Kelv/forgewatch \
-  --body sentinel
+  --body YOUR_REPOSITORY
 
 gh variable set FORGEWATCH_TARGET_DEFAULT_BRANCH \
   --repo 1Kelv/forgewatch \
@@ -435,7 +435,7 @@ gh workflow run scan.yml \
   --repo 1Kelv/forgewatch \
   --ref main \
   -f owner=1Kelv \
-  -f repository=sentinel \
+  -f repository=YOUR_REPOSITORY \
   -f revision=main \
   -f ref=main \
   -f default_branch=main \
@@ -490,7 +490,7 @@ Expose only `POST /github/webhook`. Configure an HTTPS request-size limit and ra
 5. Confirm the daily job runs after `03:17 UTC` and scans the configured default target.
 6. Confirm the report records the expected repository, full commit SHA, tool versions, coverage, and status for every check.
 7. Break a scanner path in a test configuration and confirm the result is `incomplete`, not clean.
-8. Keep automatic pull-request publication disabled for Sentinel until its repository working agreement explicitly permits Forgewatch to commit and push.
+8. Keep automatic pull-request publication disabled for every target until its repository owner explicitly permits Forgewatch to commit and push.
 
 Monitoring is not active until those checks pass in GitHub.
 
@@ -500,7 +500,7 @@ For the internal MVP, another owner has three options:
 
 1. Local use: clone Forgewatch, clone any repository they are allowed to read, add its folder in the dashboard, and run a manual or recurring local scan.
 2. Self-host: clone or fork Forgewatch, create their own GitHub App, install it only on selected repositories, configure the allow-list and secrets, and run the same workflows.
-3. Manual Pervigil onboarding: install Pervigil's App on selected repositories, then have Pervigil add the full `OWNER/REPOSITORY` name to the server allow-list and scheduled-target configuration.
+3. Hosted onboarding: install the Forgewatch App on selected repositories, then choose the repository in the hosted dashboard.
 
 After onboarding, their normal workflow is simple:
 
@@ -510,7 +510,7 @@ After onboarding, their normal workflow is simple:
 4. Review any proposed patch and its before-and-after checks.
 5. Merge only after a person approves it.
 
-The MVP is not yet a self-service public product. A public customer version still needs an installation page, organisation sign-in, tenant-safe storage, billing, and GitHub Check results or a report link that does not require access to Pervigil's private Actions repository.
+The hosted dashboard now provides installation sign-in and tenant-aware repository selection. Wider public use still needs account administration, rate limits, usage controls, billing, and GitHub Check results or a dedicated report-sharing flow.
 
 ## Pull-request handoff
 
@@ -565,7 +565,6 @@ After this repair, completed scans with findings are shown as successful runs wi
 ## Documentation
 
 - [How someone uses Forgewatch with GitHub](docs/USING_WITH_GITHUB.md)
-- [Sentinel discovery](docs/SENTINEL_DISCOVERY.md)
 - [Architecture and threat model](docs/ARCHITECTURE.md)
 - [Coverage, scanner choices, and licences](docs/COVERAGE.md)
 - [GitHub App setup and deployment](docs/GITHUB_APP.md)

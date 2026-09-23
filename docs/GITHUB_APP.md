@@ -4,19 +4,19 @@ The GitHub App is needed for webhook-triggered scans and for checking out a diff
 
 ## 1. Create the Forgewatch repository
 
-Create a new private repository for this standalone project, for example `1Kelv/forgewatch`. Push the implementation branch there after review. Do not add any Forgewatch file to Sentinel.
+Create a separate repository for Forgewatch, for example `OWNER/forgewatch`. Do not add Forgewatch files to repositories being scanned.
 
 Set these Actions variables in the Forgewatch repository:
 
-- `FORGEWATCH_TARGET_OWNER=1Kelv`
-- `FORGEWATCH_TARGET_REPOSITORY=sentinel`
+- `FORGEWATCH_TARGET_OWNER=OWNER`
+- `FORGEWATCH_TARGET_REPOSITORY=REPOSITORY`
 - `FORGEWATCH_TARGET_DEFAULT_BRANCH=main`
 
-If Sentinel moves to an organisation, install the app on that organisation, update the owner and repository variables, and update the configuration allow-list. No scanner code needs to change. Webhook-triggered runs carry the installed repository owner, name, exact commit and default branch into the scan instead of labelling every target as Sentinel.
+If a target moves to another owner or organisation, install the App for the new owner, update the repository variables, and update the configuration allow-list. No scanner code needs to change. Webhook-triggered runs carry the installed repository owner, name, exact commit and default branch into the scan.
 
 ## 2. Register a GitHub App
 
-Create a private GitHub App and install it only on the Forgewatch and Sentinel repositories.
+Create a GitHub App and install it only on the Forgewatch automation repository and approved target repositories.
 
 Repository permissions required for the complete workflow:
 
@@ -84,4 +84,4 @@ Do not call monitoring active before these checks pass in the real repositories.
 
 Keep `publish-pr` outside the validation container. Give it only a short-lived installation token. It rejects blocked or failed validation and a stale default branch. Enable branch protection or repository rules requiring Kelvin's review and the Forgewatch check. Forgewatch has no code path for merge, auto-merge or deployment.
 
-Sentinel's current repository instructions reserve commits and pushes for Kelvin. Until those instructions are deliberately updated, use generated patch artifacts for manual application and do not enable automatic PR publication for Sentinel.
+Respect each target repository's contribution rules. When commits and pushes are reserved for its maintainers, use generated patch artifacts for manual application and do not enable automatic pull-request publication.

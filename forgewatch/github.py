@@ -55,7 +55,7 @@ def publish_pull_request(root: Path, config: Dict[str, Any], artifact: Path) -> 
             for command in (
                 ["git", "switch", "-c", branch],
                 ["git", "add", "--", *metadata["changed_files"]],
-                ["git", "-c", "user.name=Forgewatch", "-c", "user.email=forgewatch@pervigil.co.uk", "commit", "-m", f"security: remediate {fingerprint}"],
+                ["git", "-c", "user.name=Forgewatch", "-c", "user.email=forgewatch@users.noreply.github.com", "commit", "-m", f"security: remediate {fingerprint}"],
                 ["git", "push", "origin", f"HEAD:refs/heads/{branch}"],
             ):
                 result = _run(command, workspace)

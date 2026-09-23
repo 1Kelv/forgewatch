@@ -28,7 +28,7 @@ class GitHubAdapterTests(unittest.TestCase):
                 client, "_request"
             ) as request:
                 client.dispatch_scan(
-                    "pervigil/forgewatch",
+                    "example/forgewatch",
                     "forgewatch_scan",
                     "acme/widget",
                     "b" * 40,

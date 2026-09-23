@@ -4,8 +4,8 @@ import test from "node:test";
 import { nextScanAt, parseGitHubRepository, validateBranch } from "../lib/repository";
 
 test("accepts a GitHub URL and returns owner/repository", () => {
-  assert.equal(parseGitHubRepository("https://github.com/1Kelv/sentinel.git"), "1Kelv/sentinel");
-  assert.equal(parseGitHubRepository("https://github.com/1Kelv/sentinel.git/"), "1Kelv/sentinel");
+  assert.equal(parseGitHubRepository("https://github.com/acme/widget.git"), "acme/widget");
+  assert.equal(parseGitHubRepository("https://github.com/acme/widget.git/"), "acme/widget");
   assert.equal(parseGitHubRepository("1Kelv/forgewatch"), "1Kelv/forgewatch");
 });
 

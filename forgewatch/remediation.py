@@ -20,7 +20,7 @@ from .scanners import run_configured_scanner
 from .store import Store
 
 
-SUPPORTED_RULE = "pervigil.javascript.browser.reverse-tabnabbing"
+SUPPORTED_RULE = "forgewatch.javascript.browser.reverse-tabnabbing"
 ANCHOR = re.compile(r"<a\b(?P<attrs>[^>]*\btarget=[\"']_blank[\"'][^>]*)>", re.IGNORECASE | re.DOTALL)
 REL = re.compile(r"\brel\s*=", re.IGNORECASE)
 FORBIDDEN_PATCH_MARKERS = (

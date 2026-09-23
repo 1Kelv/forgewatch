@@ -74,7 +74,7 @@ Add these Actions secrets to the `1Kelv/forgewatch` repository so its worker can
 - `FORGEWATCH_APP_ID`
 - `FORGEWATCH_APP_PRIVATE_KEY`
 
-The existing `FORGEWATCH_TARGET_TOKEN` may remain as a temporary fallback for Sentinel, but the GitHub App is the correct multi-repository approach.
+An existing `FORGEWATCH_TARGET_TOKEN` may remain as a temporary fallback for one private target, but the GitHub App is the correct multi-repository approach.
 
 ## 4. Create the database
 

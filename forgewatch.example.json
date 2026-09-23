@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "repository": {
-    "slug": "1Kelv/sentinel",
+    "slug": "OWNER/REPOSITORY",
     "default_branch": "main"
   },
   "policy": {
@@ -46,9 +46,7 @@
     "max_requests_per_fix": 1
   },
   "github": {
-    "target_repositories": [
-      "1Kelv/sentinel"
-    ],
+    "target_repositories": [],
     "automation_repository": "1Kelv/forgewatch",
     "dispatch_event": "forgewatch_scan"
   },

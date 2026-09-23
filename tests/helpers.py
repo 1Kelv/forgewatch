@@ -8,7 +8,7 @@ from pathlib import Path
 from forgewatch.models import Finding, Location, ScanResult, ScannerRun
 
 
-def finding(path: str = "App.tsx", line: int = 2, rule_id: str = "pervigil.javascript.browser.reverse-tabnabbing") -> Finding:
+def finding(path: str = "App.tsx", line: int = 2, rule_id: str = "forgewatch.javascript.browser.reverse-tabnabbing") -> Finding:
     return Finding(
         scanner="semgrep",
         rule_id=rule_id,

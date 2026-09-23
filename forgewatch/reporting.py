@@ -70,9 +70,9 @@ def _plain_title(finding: Finding) -> str:
         return f"Update {package} because {effect}"
     if finding.category == "secret":
         return f"Check a possible exposed secret in {_location(finding)}"
-    if finding.rule_id == "pervigil.javascript.browser.reverse-tabnabbing":
+    if finding.rule_id == "forgewatch.javascript.browser.reverse-tabnabbing":
         return "A new-tab link could let another site control the original page"
-    if finding.rule_id == "pervigil.react.security.dangerously-set-inner-html":
+    if finding.rule_id == "forgewatch.react.security.dangerously-set-inner-html":
         return "Untrusted page content could be treated as executable HTML"
     return finding.title
 
@@ -89,7 +89,7 @@ def _why_it_matters(finding: Finding) -> str:
             "If the match is a real password, token, or key, someone with repository access may be able to use it. "
             "Confirm it through an approved private channel and replace it if it is real."
         )
-    if finding.rule_id == "pervigil.javascript.browser.reverse-tabnabbing":
+    if finding.rule_id == "forgewatch.javascript.browser.reverse-tabnabbing":
         return (
             "A page opened in a new tab may be able to redirect or change the page that opened it. Adding a small "
             "link safety setting prevents that behaviour."
@@ -108,7 +108,7 @@ def _what_to_do(finding: Finding) -> str:
             "If the value is real, revoke or rotate it first. Then remove it from the current files and, when "
             "necessary, from Git history."
         )
-    if finding.rule_id == "pervigil.javascript.browser.reverse-tabnabbing":
+    if finding.rule_id == "forgewatch.javascript.browser.reverse-tabnabbing":
         return 'Add rel="noopener noreferrer" to the link, then rerun the code safety check and project tests.'
     return finding.remediation
 
