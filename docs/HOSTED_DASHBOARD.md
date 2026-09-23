@@ -1,6 +1,6 @@
 # Hosted dashboard on Vercel
 
-The hosted dashboard is the phone-friendly way to use Forgewatch. A user signs in with GitHub, selects a repository where the Forgewatch GitHub App is installed, chooses a branch and frequency, and starts a scan. GitHub Actions performs the scan. Vercel only hosts the interface and dispatches the workflow.
+The hosted dashboard is the phone-friendly way to use Forgewatch. A user signs in with GitHub, selects a repository where the Forgewatch GitHub App is installed, chooses a branch and frequency, and starts a scan. The target repository's own GitHub Actions area performs the scan. Vercel only hosts the interface, schedule records, and workflow dispatcher.
 
 The hosted dashboard never accepts a local folder path. A pasted value must be a `https://github.com/OWNER/REPOSITORY` URL, and the server verifies that the signed-in user and the Forgewatch GitHub App can access it.
 
@@ -14,6 +14,7 @@ The hosted dashboard never accepts a local folder path. A pasted value must be a
 - Plain-English `scan.md` reports displayed inside the dashboard.
 - A daily scheduler endpoint protected by `CRON_SECRET`.
 - PostgreSQL storage for repository choices, schedules, and run IDs.
+- A copyable, no-terminal repository setup guide at `/setup`.
 
 The first deployment is restricted to the GitHub names in `FORGEWATCH_ALLOWED_GITHUB_LOGINS`. Use a comma-separated list for invited testers. The special value `*` permits any GitHub user to sign in, but should only be enabled deliberately after reviewing usage limits and the GitHub App's public installation settings.
 
@@ -46,16 +47,13 @@ Minimum repository permissions for hosted scanning:
 
 - Metadata: read-only, supplied automatically.
 - Contents: read-only, so the worker can check out approved repositories.
-- Actions: read and write, so the hosted controller can start and inspect the central scan workflow.
+- Actions: read and write, so the hosted controller can start and inspect the target repository's approved scan workflow.
 
 Do not grant pull-request or contents write access until reviewed fix pull requests are deliberately enabled. That can use a separate publisher App later.
 
-Install the App on:
+Install the App on every repository that should appear in the dashboard. The dashboard deliberately hides `1Kelv/forgewatch` from the target list because it supplies the reusable scanner.
 
-1. `1Kelv/forgewatch`, which contains the central workflow.
-2. Every repository that should appear in the dashboard.
-
-To let people outside the App owner's account install it, change the GitHub App installation setting to `Any account`. The App does not need to be listed in GitHub Marketplace.
+To let people outside the App owner's account install it, make the GitHub App public. In the current GitHub interface, open the App's `Advanced` settings and use the visibility control in the danger zone. This replaces the older `Any account` wording. The App does not need to be listed in GitHub Marketplace.
 
 Record these values from the App settings:
 
@@ -67,14 +65,13 @@ Record these values from the App settings:
 
 Never commit these values.
 
-## 3. Add the Actions worker credentials
+## 3. Publish the reusable scanner
 
-Add these Actions secrets to the `1Kelv/forgewatch` repository so its worker can check out private targets:
+The `1Kelv/forgewatch` repository must be public before unrelated GitHub accounts can call `.github/workflows/reusable-scan.yml`. Audit the files and complete Git history for credentials, private keys, local environment files, private customer data, and anything else that must not become public before changing repository visibility.
 
-- `FORGEWATCH_APP_ID`
-- `FORGEWATCH_APP_PRIVATE_KEY`
+Each target repository must then add `.github/workflows/forgewatch.yml`. Follow [the repository installation guide](INSTALL_REPOSITORY.md). The user can do this entirely through GitHub's website, including on a phone.
 
-An existing `FORGEWATCH_TARGET_TOKEN` may remain as a temporary fallback for one private target, but the GitHub App is the correct multi-repository approach.
+The target workflow requests read-only access to repository contents. No Forgewatch App secret or personal access token is copied into the target repository.
 
 ## 4. Create the database
 
@@ -117,7 +114,7 @@ To permit any GitHub user to sign in, use:
 FORGEWATCH_ALLOWED_GITHUB_LOGINS=*
 ```
 
-Repository choices are still limited to installations and repositories that the signed-in user is explicitly allowed to access. The central automation repository is hidden from the scan target selector.
+Repository choices are still limited to installations and repositories that the signed-in user is explicitly allowed to access. Dashboard monitor records are filtered by the signed-in GitHub user ID. One user does not inherit another user's repository list or monitoring cards. The central automation repository is hidden from the scan target selector.
 
 Redeploy the project. Environment-variable changes do not affect an earlier deployment until a new deployment is created.
 
@@ -126,11 +123,12 @@ Redeploy the project. Environment-variable changes do not affect an earlier depl
 1. Open the deployed dashboard on a phone or computer.
 2. Select `Continue with GitHub`.
 3. If no repositories appear, select `Manage repository access` and add one to the App installation.
-4. Paste or select its GitHub URL.
-5. Keep `Manual only` for the first test and select `Run scan`.
-6. Confirm a new `Forgewatch scan` run starts in `1Kelv/forgewatch`.
-7. Wait for completion and select `View report` in the dashboard.
-8. Change the frequency to daily, refresh the page, and confirm the choice remains saved.
+4. Add `.github/workflows/forgewatch.yml` by following the dashboard's `Repository setup guide`.
+5. Select the repository in the dashboard.
+6. Keep `Manual only` for the first test and select `Run scan`.
+7. Confirm a new `Forgewatch` run starts in the target repository.
+8. Wait for completion and select `View report` in the dashboard.
+9. Change the frequency to daily, refresh the page, and confirm the choice remains saved.
 
 Vercel's free Hobby cron schedule runs once per day, so the first hosted version offers manual, daily, and weekly choices. More frequent schedules require a plan or scheduler that supports them.
 

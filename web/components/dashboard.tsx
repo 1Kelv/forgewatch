@@ -81,6 +81,7 @@ export function Dashboard({ appSlug }: { appSlug: string }) {
   const [monitorsOpen, setMonitorsOpen] = useState(false);
   const previousMonitorAttention = useRef(false);
   const [report, setReport] = useState<{ name: string; text: string } | null>(null);
+  const workflowSetupNeeded = error.toLowerCase().includes("workflow is not installed");
 
   const loadMonitors = useCallback(async () => {
     const value = await api<{ monitors: Monitor[] }>("/api/scans");
@@ -288,10 +289,13 @@ export function Dashboard({ appSlug }: { appSlug: string }) {
 
       <header className="pageHeader">
         <div><p className="eyebrow">Security overview</p><h1>Repository dashboard</h1><p>Start a scan, change a schedule, or open the latest plain-English report.</p></div>
-        {appSlug && <a className="button secondary compact" href={`https://github.com/apps/${appSlug}/installations/new`} target="_blank" rel="noreferrer">Manage repository access</a>}
+        <div className="headerActions">
+          <a className="button secondary compact" href="/setup">Repository setup guide</a>
+          {appSlug && <a className="button secondary compact" href={`https://github.com/apps/${appSlug}/installations/new`} target="_blank" rel="noreferrer">Manage repository access</a>}
+        </div>
       </header>
 
-      {error && <div className="message error" role="alert">{error}</div>}
+      {error && <div className="message error" role="alert">{error}{workflowSetupNeeded && <a className="messageLink" href="/setup">Open the setup guide</a>}</div>}
       {notice && <div className="message success" role="status">{notice}</div>}
 
       <section className="panel scanPanel">
@@ -315,6 +319,7 @@ export function Dashboard({ appSlug }: { appSlug: string }) {
         ) : (
           <div className="empty"><h3>No scan targets are connected yet</h3><p>Choose repositories in GitHub, then return to this tab. The private Forgewatch worker is intentionally hidden from this list.</p>{appSlug && <a className="button primary" href={`https://github.com/apps/${appSlug}/installations/new`} target="_blank" rel="noreferrer">Choose repositories</a>}</div>
         )}
+        <p className="panelNote">Forgewatch itself is hidden because it supplies the scanner rather than acting as a target. Before a repository&apos;s first scan, <a href="/setup">add its one-time workflow file</a>.</p>
       </section>
 
       <section className="repositorySection">

@@ -1,0 +1,159 @@
+name: Forgewatch reusable scan
+
+on:
+  workflow_call:
+    inputs:
+      revision:
+        description: Exact commit SHA to scan
+        required: true
+        type: string
+      ref:
+        description: Branch name recorded in the report
+        required: true
+        type: string
+      default_branch:
+        description: Repository default branch
+        required: true
+        type: string
+      trigger:
+        description: What started the scan
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: forgewatch-${{ github.repository_id }}-${{ inputs.revision }}
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      TARGET_REPOSITORY: ${{ github.repository }}
+      TARGET_REVISION: ${{ inputs.revision }}
+      TARGET_REF: ${{ inputs.ref }}
+      TARGET_DEFAULT_BRANCH: ${{ inputs.default_branch }}
+      SCAN_TRIGGER: ${{ inputs.trigger }}
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+
+    steps:
+      - name: Check out the repository being scanned
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.TARGET_REVISION }}
+          path: target
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check out Forgewatch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: forgewatch
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: forgewatch/pyproject.toml
+
+      - name: Restore finding history
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: forgewatch/.forgewatch/state.db
+          key: forgewatch-state-${{ github.repository_id }}-${{ github.run_id }}
+          restore-keys: |
+            forgewatch-state-${{ github.repository_id }}-
+
+      - name: Install the pinned scanners
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install ./forgewatch semgrep==1.177.0
+          mkdir -p "$RUNNER_TEMP/forgewatch-bin" "$RUNNER_TEMP/forgewatch-downloads"
+          cd "$RUNNER_TEMP/forgewatch-downloads"
+          curl --fail --location --silent --show-error --output osv-scanner https://github.com/google/osv-scanner/releases/download/v2.5.1/osv-scanner_linux_amd64
+          curl --fail --location --silent --show-error --output osv-checksums https://github.com/google/osv-scanner/releases/download/v2.5.1/osv-scanner_SHA256SUMS
+          grep 'osv-scanner_linux_amd64$' osv-checksums | sed 's/osv-scanner_linux_amd64/osv-scanner/' | sha256sum --check --strict
+          install -m 0755 osv-scanner "$RUNNER_TEMP/forgewatch-bin/osv-scanner"
+          curl --fail --location --silent --show-error --output gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          curl --fail --location --silent --show-error --output gitleaks-checksums https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_checksums.txt
+          grep 'gitleaks_8.30.1_linux_x64.tar.gz$' gitleaks-checksums | sed 's/gitleaks_8.30.1_linux_x64.tar.gz/gitleaks.tar.gz/' | sha256sum --check --strict
+          tar -xzf gitleaks.tar.gz gitleaks
+          install -m 0755 gitleaks "$RUNNER_TEMP/forgewatch-bin/gitleaks"
+          echo "$RUNNER_TEMP/forgewatch-bin" >> "$GITHUB_PATH"
+
+      - name: Prepare JavaScript dependencies without running project scripts
+        shell: bash
+        working-directory: target
+        run: |
+          set -euo pipefail
+          if [[ -f package-lock.json ]]; then
+            npm ci --ignore-scripts
+          fi
+
+      - name: Scan the repository
+        id: scan
+        shell: bash
+        run: |
+          set +e
+          forgewatch \
+            --root "$GITHUB_WORKSPACE/target" \
+            --config "$GITHUB_WORKSPACE/forgewatch/forgewatch.example.json" \
+            --repository "$TARGET_REPOSITORY" \
+            --default-branch "$TARGET_DEFAULT_BRANCH" \
+            scan \
+            --trigger "$SCAN_TRIGGER" \
+            --ref "$TARGET_REF" \
+            --report-dir ".forgewatch/artifacts/run-${GITHUB_RUN_ID}" \
+            --prepare-fixes \
+            --fail-on high
+          scan_exit_code=$?
+          set -e
+          echo "exit_code=$scan_exit_code" >> "$GITHUB_OUTPUT"
+
+          report="$GITHUB_WORKSPACE/forgewatch/.forgewatch/artifacts/run-${GITHUB_RUN_ID}/scan.md"
+          if [[ "$scan_exit_code" == "0" ]]; then
+            echo "### Scan completed: no important finding reached the failure threshold" >> "$GITHUB_STEP_SUMMARY"
+          elif [[ "$scan_exit_code" == "1" ]]; then
+            echo "::warning::The scan completed and found important items to review. Open the uploaded scan.md report."
+            echo "### Scan completed: important items need review" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::error::The scan was incomplete. A check could not finish. Open scan.md for the reason."
+            echo "### Scan incomplete" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          if [[ -f "$report" ]]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            sed -n '/^> \*\*Why .* did not finish:/p' "$report" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Download the report artifact and open scan.md for the complete plain-English result." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Save finding history
+        if: always() && steps.scan.outcome != 'skipped'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: forgewatch/.forgewatch/state.db
+          key: forgewatch-state-${{ github.repository_id }}-${{ github.run_id }}
+
+      - name: Upload the plain-English report
+        if: always() && steps.scan.outcome != 'skipped'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: forgewatch-${{ github.run_id }}
+          path: forgewatch/.forgewatch/artifacts/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Mark an incomplete scan as failed
+        if: steps.scan.outcome != 'skipped' && steps.scan.outputs.exit_code != '0' && steps.scan.outputs.exit_code != '1'
+        shell: bash
+        run: exit 1

@@ -1,0 +1,36 @@
+name: Forgewatch
+
+on:
+  workflow_dispatch:
+    inputs:
+      revision:
+        description: Exact commit SHA to scan
+        required: true
+        type: string
+      ref:
+        description: Branch name recorded in the report
+        required: true
+        type: string
+      default_branch:
+        description: Repository default branch
+        required: true
+        type: string
+      trigger:
+        description: What started the scan
+        required: true
+        type: choice
+        options:
+          - manual
+          - schedule
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    uses: 1Kelv/forgewatch/.github/workflows/reusable-scan.yml@main
+    with:
+      revision: ${{ inputs.revision }}
+      ref: ${{ inputs.ref }}
+      default_branch: ${{ inputs.default_branch }}
+      trigger: ${{ inputs.trigger }}

@@ -104,13 +104,29 @@ export async function removeMonitor(githubUserId: number, repositoryId: string):
   if (!rows[0]) throw new Error("That monitored repository was not found.");
 }
 
-export async function monitorOwnsRun(githubUserId: number, runId: string): Promise<boolean> {
+export async function monitorForRun(githubUserId: number, runId: string): Promise<Monitor | null> {
   const rows = await db()`
-    SELECT 1 FROM forgewatch_monitors
+    SELECT * FROM forgewatch_monitors
     WHERE github_user_id = ${githubUserId} AND last_run_id = ${runId}
     LIMIT 1
   `;
-  return Boolean(rows[0]);
+  return rows[0] ? monitor(rows[0]) : null;
+}
+
+export function runRepositoryFullName(
+  value: Pick<Monitor, "lastRunUrl" | "repositoryFullName">,
+): string {
+  if (!value.lastRunUrl) return value.repositoryFullName;
+  try {
+    const url = new URL(value.lastRunUrl);
+    const parts = url.pathname.split("/").filter(Boolean);
+    if (url.hostname === "github.com" && parts.length >= 5 && parts[2] === "actions") {
+      return `${parts[0]}/${parts[1]}`;
+    }
+  } catch {
+    // Fall back to the monitored repository when an old URL cannot be parsed.
+  }
+  return value.repositoryFullName;
 }
 
 export async function claimDueMonitors(): Promise<Monitor[]> {

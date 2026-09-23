@@ -2,13 +2,14 @@ import { z } from "zod";
 
 import {
   automationToken,
+  createInstallationToken,
   dispatchScan,
   findAvailableRepository,
   getWorkflowRun,
   resolveCommit,
 } from "@/lib/github";
 import { errorResponse, requireSameOrigin } from "@/lib/http";
-import { listMonitors, saveMonitor } from "@/lib/monitors";
+import { listMonitors, runRepositoryFullName, saveMonitor } from "@/lib/monitors";
 import { FREQUENCIES, parseGitHubRepository, validateBranch } from "@/lib/repository";
 import { requireSession } from "@/lib/session";
 
@@ -22,12 +23,24 @@ export async function GET() {
   try {
     const session = await requireSession();
     const monitors = await listMonitors(session.githubUserId);
-    const token = monitors.some((item) => item.lastRunId) ? await automationToken() : null;
+    let legacyToken: string | null = null;
     const values = await Promise.all(
       monitors.map(async (monitor) => {
-        if (!monitor.lastRunId || !token) return { ...monitor, run: null };
+        if (!monitor.lastRunId) return { ...monitor, run: null };
         try {
-          const run = await getWorkflowRun(Number(monitor.lastRunId), token);
+          const runRepository = runRepositoryFullName(monitor);
+          let token: string;
+          if (runRepository.toLowerCase() === monitor.repositoryFullName.toLowerCase()) {
+            token = await createInstallationToken(
+              Number(monitor.installationId),
+              [Number(monitor.repositoryId)],
+              { actions: "read", metadata: "read" },
+            );
+          } else {
+            legacyToken ||= await automationToken();
+            token = legacyToken;
+          }
+          const run = await getWorkflowRun(runRepository, Number(monitor.lastRunId), token);
           return {
             ...monitor,
             run: {
@@ -61,8 +74,13 @@ export async function POST(request: Request) {
     const fullName = parseGitHubRepository(input.repository);
     const repository = await findAvailableRepository(session.accessToken, fullName);
     const branch = validateBranch(input.branch || repository.defaultBranch);
-    const commit = await resolveCommit(repository.fullName, branch, session.accessToken);
-    const run = await dispatchScan({ repository, branch, commit, trigger: "manual" });
+    const token = await createInstallationToken(
+      repository.installationId,
+      [repository.id],
+      { actions: "write", contents: "read", metadata: "read" },
+    );
+    const commit = await resolveCommit(repository.fullName, branch, token);
+    const run = await dispatchScan({ repository, branch, commit, trigger: "manual" }, token);
     await saveMonitor({
       githubUserId: session.githubUserId,
       repository,

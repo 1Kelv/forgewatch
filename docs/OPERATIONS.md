@@ -2,17 +2,17 @@
 
 ## Scan lifecycle
 
-The included workflow supports:
+The legacy central workflow supports:
 
 - `workflow_dispatch` for manual scans.
 - `repository_dispatch` for signed GitHub push and pull-request events.
-- A daily schedule at 03:17 UTC.
+- No automatic timer. Hosted schedules are dispatched by the Vercel cron into each selected target.
 
-The daily workflow defaults to scanning the Forgewatch repository itself. That path uses the workflow's built-in GitHub token and needs no GitHub App. A public external target also needs no App. A different private target requires either the configured GitHub App secrets or a read-only `FORGEWATCH_TARGET_TOKEN` secret.
+Hosted dashboard scans use `.github/workflows/reusable-scan.yml` through a small caller workflow committed to each target. The run, logs, cache, artifact storage, and Actions usage belong to the target repository. The dashboard's Vercel cron dispatches due daily and weekly scans; it does not perform the scan itself.
 
 Completed scans with findings upload their reports and finish with a workflow warning. Only an incomplete scan or operational failure makes the workflow red. This keeps “problems were found” separate from “the scanner did not work.”
 
-Each run checks out Forgewatch and the exact target revision separately. Scanner releases and third-party Actions are pinned. Downloaded OSV-Scanner and Gitleaks binaries are checked against their published SHA-256 checksum files. Reports and candidate patches are retained as workflow artifacts for 30 days.
+Each run checks out Forgewatch and the exact target revision separately. Scanner releases and third-party Actions are pinned. Downloaded OSV-Scanner and Gitleaks binaries are checked against their published SHA-256 checksum files. Reports and candidate patches are retained as workflow artifacts for 30 days in the target repository.
 
 The local dashboard offers manual, six-hourly, daily, and weekly schedules. Those schedules are deliberately local and run only while `forgewatch dashboard` remains open. Repository selection and next-run times are stored in `.forgewatch/dashboard.json`.
 
@@ -32,7 +32,7 @@ Prioritise critical and high findings, then confidence, production reachability 
 
 The scanner CLIs selected for the MVP have no per-scan fee under the linked licences. Operating costs to monitor are:
 
-- GitHub Actions minutes, cache storage and 30-day report artifacts for a private Forgewatch repository. GitHub provides plan-dependent quotas and bills overages. Review the [current GitHub Actions billing documentation](https://docs.github.com/en/billing/concepts/product-billing/github-actions) rather than hard-coding an estimate.
+- GitHub Actions minutes, cache storage and 30-day report artifacts in each target repository. GitHub provides plan-dependent quotas and bills overages to the target owner's account or organisation. Review the [current GitHub Actions billing documentation](https://docs.github.com/en/billing/concepts/product-billing/github-actions) rather than hard-coding an estimate.
 - Compute and HTTPS hosting for the webhook dispatcher if it is not colocated with existing internal infrastructure.
 - Container registry and retained log or database storage.
 - OpenAI API input and output tokens when `--ai` is used. The example uses `gpt-5.6-terra`, one request and at most 6,000 output tokens per fix. Check the [current OpenAI model pricing](https://developers.openai.com/api/docs/models) before enabling it.

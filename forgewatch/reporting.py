@@ -177,9 +177,31 @@ def _plain_coverage(scanner: str, coverage: str) -> str:
     return coverage
 
 
+def _plain_scanner_error(scanner: str, error: str) -> str:
+    name = CHECK_NAMES.get(scanner, "This check")
+    lowered = error.lower()
+    if "timed out" in lowered or "timeout" in lowered:
+        return f"{name} took too long and was stopped. Run the scan again."
+    if "executable not found" in lowered:
+        return f"Forgewatch could not start {name.lower()} because the required checking program was missing."
+    if "no space left" in lowered:
+        return f"{name} stopped because the temporary GitHub worker ran out of storage."
+    if any(term in lowered for term in ("network", "connection", "dns", "certificate", "tls")):
+        return f"{name} could not reach a service it needs. This may be temporary, so run the scan again."
+    if any(term in lowered for term in ("parse", "invalid json", "malformed")):
+        return f"{name} returned information Forgewatch could not read. The dependency file or checker output may use an unsupported format."
+    return f"{name} stopped before it returned a usable result. Run the scan again once, then use the technical message below if it repeats."
+
+
 def plain_language(result: ScanResult) -> Dict[str, Any]:
     if result.status == "incomplete":
-        next_step = "Fix the checks that did not run, then scan again. Do not treat this result as an all-clear."
+        unfinished = [
+            CHECK_NAMES.get(run.scanner, run.scanner)
+            for run in result.scanner_runs
+            if run.status in {"failed", "skipped"}
+        ]
+        subject = ", ".join(unfinished) if unfinished else "One or more checks"
+        next_step = f"{subject} could not finish. Read the reason below, fix it, then scan again. Do not treat this result as an all-clear."
     elif result.findings:
         next_step = "Review the urgent and important items first. Confirm real-world impact before changing code."
     else:
@@ -237,10 +259,12 @@ def markdown(result: ScanResult) -> str:
         status = _safe_markdown(CHECK_STATUS.get(run.status, run.status))
         lines.append(f"| {name} | {status} | {coverage} | {_safe_markdown(run.version)} |")
         if run.error:
-            lines.extend(["", f"> **Why {name.lower()} did not finish:** {_safe_markdown(run.error[:500])}"])
+            lines.extend(["", f"> **Why {name.lower()} did not finish:** {_safe_markdown(_plain_scanner_error(run.scanner, run.error))}"])
     lines.extend(["", "<details>", "<summary>Exact technical coverage</summary>", ""])
     for run in result.scanner_runs:
         lines.append(f"- {_safe_markdown(run.scanner)}: {_safe_markdown(run.coverage)}")
+        if run.error:
+            lines.append(f"  - Failure message: {_safe_markdown(run.error[:500])}")
     lines.extend(["", "</details>"])
     lines.extend(["", "## Items to review", ""])
     if not result.findings:

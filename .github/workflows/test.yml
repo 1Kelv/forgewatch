@@ -61,6 +61,23 @@ jobs:
         shell: bash
         run: python -m pip wheel . --no-deps --wheel-dir "$RUNNER_TEMP/forgewatch-wheel"
 
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Test and build the hosted dashboard
+        shell: bash
+        working-directory: web
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run typecheck
+          npm test
+          npm run build
+
       - name: Run the real-scanner security fixture
         shell: bash
         run: python scripts/demo.py

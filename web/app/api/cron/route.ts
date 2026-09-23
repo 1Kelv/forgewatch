@@ -37,15 +37,18 @@ export async function GET(request: Request) {
         const targetToken = await createInstallationToken(
           repository.installationId,
           [repository.id],
-          { contents: "read", metadata: "read" },
+          { actions: "write", contents: "read", metadata: "read" },
         );
         const commit = await resolveCommit(repository.fullName, monitor.scanBranch, targetToken);
-        const run = await dispatchScan({
-          repository,
-          branch: monitor.scanBranch,
-          commit,
-          trigger: "schedule",
-        });
+        const run = await dispatchScan(
+          {
+            repository,
+            branch: monitor.scanBranch,
+            commit,
+            trigger: "schedule",
+          },
+          targetToken,
+        );
         await recordScheduledRun(monitor, run.runId, run.runUrl);
         return { repository: repository.fullName, queued: true, runId: run.runId };
       } catch (error) {

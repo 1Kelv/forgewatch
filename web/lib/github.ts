@@ -8,6 +8,16 @@ const API = "https://api.github.com";
 const API_VERSION = "2026-03-10";
 const PAGE_SIZE = 100;
 const MAX_PAGES = 20;
+const TARGET_WORKFLOW = "forgewatch.yml";
+
+class GitHubRequestError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
 
 type GitHubRepository = {
   id: number;
@@ -57,7 +67,10 @@ async function githubFetch<T>(path: string, token: string, init: RequestInit = {
     } catch {
       // Keep the status-based message when GitHub does not return JSON.
     }
-    throw new Error(`GitHub could not complete the request: ${message}`);
+    throw new GitHubRequestError(
+      response.status,
+      `GitHub could not complete the request: ${message}`,
+    );
   }
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
@@ -179,7 +192,7 @@ export async function automationToken(): Promise<string> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         repositories: [automation.repository],
-        permissions: { actions: "write", metadata: "read" },
+        permissions: { actions: "read", metadata: "read" },
       }),
     },
   );
@@ -204,52 +217,63 @@ export async function dispatchScan(input: {
   branch: string;
   commit: string;
   trigger: "manual" | "schedule";
-}): Promise<{ runId: number; runUrl: string }> {
-  const automation = automationRepository();
-  const token = await automationToken();
-  const [owner, repository] = input.repository.fullName.split("/");
-  const result = await githubFetch<{
-    workflow_run_id: number;
-    html_url: string;
-  }>(
-    `/repos/${automation.owner}/${automation.repository}/actions/workflows/scan.yml/dispatches`,
-    token,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ref: automation.ref,
-        inputs: {
-          owner,
-          repository,
-          revision: input.commit,
-          ref: input.branch,
-          default_branch: input.repository.defaultBranch,
-          trigger: input.trigger,
-        },
-      }),
-    },
-  );
+}, token: string): Promise<{ runId: number; runUrl: string }> {
+  let result: { workflow_run_id: number; html_url: string };
+  try {
+    result = await githubFetch<{
+      workflow_run_id: number;
+      html_url: string;
+    }>(
+      `/repos/${input.repository.fullName}/actions/workflows/${TARGET_WORKFLOW}/dispatches`,
+      token,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ref: input.repository.defaultBranch,
+          inputs: {
+            revision: input.commit,
+            ref: input.branch,
+            default_branch: input.repository.defaultBranch,
+            trigger: input.trigger,
+          },
+        }),
+      },
+    );
+  } catch (error) {
+    if (error instanceof GitHubRequestError && error.status === 404) {
+      throw new Error(
+        "This repository is approved, but its Forgewatch workflow is not installed yet. Open the setup guide, add .github/workflows/forgewatch.yml, then try again.",
+      );
+    }
+    throw error;
+  }
   if (!Number.isSafeInteger(result.workflow_run_id) || !result.html_url) {
     throw new Error("GitHub accepted the scan but did not return its run details.");
   }
   return { runId: result.workflow_run_id, runUrl: result.html_url };
 }
 
-export async function getWorkflowRun(runId: number, token: string): Promise<WorkflowRun> {
-  const automation = automationRepository();
+export async function getWorkflowRun(
+  fullName: string,
+  runId: number,
+  token: string,
+): Promise<WorkflowRun> {
   return githubFetch<WorkflowRun>(
-    `/repos/${automation.owner}/${automation.repository}/actions/runs/${runId}`,
+    `/repos/${fullName}/actions/runs/${runId}`,
     token,
   );
 }
 
-export async function downloadReport(runId: number, token: string): Promise<ArrayBuffer> {
-  const automation = automationRepository();
+export async function downloadReport(
+  fullName: string,
+  runId: number,
+  token: string,
+): Promise<ArrayBuffer> {
   const artifacts = await githubFetch<{
     artifacts: Array<{ id: number; name: string; expired: boolean }>;
   }>(
-    `/repos/${automation.owner}/${automation.repository}/actions/runs/${runId}/artifacts?per_page=100`,
+    `/repos/${fullName}/actions/runs/${runId}/artifacts?per_page=100`,
     token,
   );
   const artifact = artifacts.artifacts.find(
@@ -257,7 +281,7 @@ export async function downloadReport(runId: number, token: string): Promise<Arra
   );
   if (!artifact) throw new Error("The report is not ready yet, or its artifact has expired.");
   const response = await fetch(
-    `${API}/repos/${automation.owner}/${automation.repository}/actions/artifacts/${artifact.id}/zip`,
+    `${API}/repos/${fullName}/actions/artifacts/${artifact.id}/zip`,
     {
       headers: {
         Accept: "application/vnd.github+json",

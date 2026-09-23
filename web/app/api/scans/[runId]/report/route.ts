@@ -1,8 +1,8 @@
 import { unzipSync } from "fflate";
 
-import { automationToken, downloadReport } from "@/lib/github";
+import { automationToken, createInstallationToken, downloadReport } from "@/lib/github";
 import { errorResponse } from "@/lib/http";
-import { monitorOwnsRun } from "@/lib/monitors";
+import { monitorForRun, runRepositoryFullName } from "@/lib/monitors";
 import { requireSession } from "@/lib/session";
 
 export async function GET(
@@ -13,10 +13,19 @@ export async function GET(
     const session = await requireSession();
     const { runId } = await context.params;
     if (!/^\d+$/.test(runId)) throw new Error("The scan run ID is invalid.");
-    if (!(await monitorOwnsRun(session.githubUserId, runId))) {
+    const monitor = await monitorForRun(session.githubUserId, runId);
+    if (!monitor) {
       throw new Error("That scan report is not available to this account.");
     }
-    const archive = await downloadReport(Number(runId), await automationToken());
+    const runRepository = runRepositoryFullName(monitor);
+    const token = runRepository.toLowerCase() === monitor.repositoryFullName.toLowerCase()
+      ? await createInstallationToken(
+        Number(monitor.installationId),
+        [Number(monitor.repositoryId)],
+        { actions: "read", metadata: "read" },
+      )
+      : await automationToken();
+    const archive = await downloadReport(runRepository, Number(runId), token);
     if (archive.byteLength > 10 * 1024 * 1024) throw new Error("The report archive is unexpectedly large.");
     const files = unzipSync(new Uint8Array(archive), {
       filter: (file) => file.name.endsWith("scan.md") && file.originalSize <= 1024 * 1024,

@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import { nextScanAt, parseGitHubRepository, validateBranch } from "../lib/repository";
 import { isGitHubLoginAllowed } from "../lib/env";
+import { runRepositoryFullName } from "../lib/monitors";
+import { targetWorkflow } from "../lib/setup-workflow";
 
 test("accepts a GitHub URL and returns owner/repository", () => {
   assert.equal(parseGitHubRepository("https://github.com/acme/widget.git"), "acme/widget");
@@ -43,4 +46,26 @@ test("allows named GitHub users and supports an explicit public-access wildcard"
     if (previous === undefined) delete process.env.FORGEWATCH_ALLOWED_GITHUB_LOGINS;
     else process.env.FORGEWATCH_ALLOWED_GITHUB_LOGINS = previous;
   }
+});
+
+test("uses the repository recorded in each workflow run URL", () => {
+  assert.equal(
+    runRepositoryFullName({
+      repositoryFullName: "friend/project",
+      lastRunUrl: "https://github.com/friend/project/actions/runs/123",
+    }),
+    "friend/project",
+  );
+  assert.equal(
+    runRepositoryFullName({
+      repositoryFullName: "friend/project",
+      lastRunUrl: "https://github.com/1Kelv/forgewatch/actions/runs/456",
+    }),
+    "1Kelv/forgewatch",
+  );
+});
+
+test("shows the same target workflow in the setup page and repository template", async () => {
+  const template = await readFile("../templates/forgewatch.yml", "utf8");
+  assert.equal(targetWorkflow, template);
 });

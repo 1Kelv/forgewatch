@@ -2,21 +2,22 @@
 
 ## Separation
 
-Forgewatch has its own Git repository, runtime, configuration and state. A target checkout is passed with `--root`; no agent file needs to exist in that target. Repository identifiers are runtime configuration and may name any authorised Git checkout.
+Forgewatch has its own Git repository, runtime, configuration and state. Local scans receive a target checkout through `--root`. Hosted targets add only a small GitHub Actions caller workflow; scanner source is loaded from the standalone Forgewatch repository.
 
 ```text
-GitHub push or pull request
+Forgewatch dashboard or schedule
           |
           v
-  signed webhook dispatcher  <---- GitHub App private key
+  Vercel dispatcher  <---- GitHub App private key
           |
-          | repository_dispatch with repository, SHA and ref
+          | workflow_dispatch with exact SHA and ref
           v
-  disposable Actions job
+  target repository's disposable Actions job
           |
-          +--> target checkout using a short-lived installation token
-          |       token is not persisted
+          +--> target checkout using GitHub's job token
+          |       contents read-only; token is not persisted
           |
+          +--> public Forgewatch reusable workflow
           +--> Semgrep + OSV-Scanner + Gitleaks
           |       no GitHub, approval or AI credentials
           |
@@ -41,7 +42,7 @@ credential-bearing controller
 
 Untrusted inputs include every repository file and filename, Git history and metadata, scanner stdout and stderr, AI output, webhook payload and issue or pull-request text. They are handled as data and never interpolated into executable scanner commands. Subprocess scanner arguments are arrays. Validation commands come only from trusted Forgewatch configuration.
 
-The dispatcher validates `X-Hub-Signature-256` with HMAC-SHA256 and constant-time comparison before parsing the body. It checks delivery ID shape, rejects duplicate delivery IDs, accepts only configured repositories and validates commit SHA format. A unique SQLite lease prevents concurrent fixes for the same repository and finding.
+The hosted dispatcher accepts only authenticated users, validates same-origin state-changing requests, checks that the selected repository belongs to an App installation visible to that user, resolves the requested branch to an exact commit, and uses a repository-scoped installation token. Monitor queries include the signed-in GitHub user ID. The separate webhook service validates `X-Hub-Signature-256` with HMAC-SHA256 and constant-time comparison before parsing the body.
 
 ## Execution controls
 

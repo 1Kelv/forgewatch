@@ -31,8 +31,6 @@ on:
         default: manual
   repository_dispatch:
     types: [forgewatch_scan]
-  schedule:
-    - cron: "17 3 * * *"
 
 permissions:
   contents: read

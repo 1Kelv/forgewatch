@@ -1,44 +1,32 @@
 # GitHub App setup and deployment
 
-The GitHub App is needed for webhook-triggered scans and for checking out a different private repository. It is not needed for a scheduled scan of Forgewatch itself or a public target. Do not call App-based monitoring active until every step below is completed and a signed test delivery plus workflow run are verified.
+The GitHub App lets the hosted dashboard authenticate users, list only repositories they approved, resolve an exact commit, start the target repository's workflow, and read its status and report artifact. The App does not receive source-code write access for scanning.
 
 ## 1. Create the Forgewatch repository
 
 Create a separate repository for Forgewatch, for example `OWNER/forgewatch`. Do not add Forgewatch files to repositories being scanned.
 
-Set these Actions variables in the Forgewatch repository:
-
-- `FORGEWATCH_TARGET_OWNER=OWNER`
-- `FORGEWATCH_TARGET_REPOSITORY=REPOSITORY`
-- `FORGEWATCH_TARGET_DEFAULT_BRANCH=main`
-
-If a target moves to another owner or organisation, install the App for the new owner, update the repository variables, and update the configuration allow-list. No scanner code needs to change. Webhook-triggered runs carry the installed repository owner, name, exact commit and default branch into the scan.
+The central repository must contain `.github/workflows/reusable-scan.yml` and be public before unrelated GitHub accounts can call it. Each target adds the small caller from [INSTALL_REPOSITORY.md](INSTALL_REPOSITORY.md). No per-target Actions variable or secret is required.
 
 ## 2. Register a GitHub App
 
-Create a GitHub App and install it only on the Forgewatch automation repository and approved target repositories.
+Create a GitHub App and let repository owners install it only on targets they approve.
 
 Repository permissions required for the complete workflow:
 
 - Metadata: read-only, implicit.
-- Contents: read and write. Read is used to check out targets. Write is required by GitHub's repository-dispatch endpoint and by optional fix branches.
-- Pull requests: read and write. Read enables pull-request webhook payloads. Write is used only by the explicit `publish-pr` controller command.
+- Contents: read-only. This resolves the requested branch to an exact commit.
 - Actions: read and write when the hosted controller starts and inspects workflow runs.
 
-Subscribe to `push` and `pull_request` events. Set a high-entropy webhook secret and the webhook URL to `https://YOUR_HOST/github/webhook`.
+The hosted manual and scheduled dashboard flow does not require webhook subscriptions. If the separate webhook service is enabled later, subscribe only to the events it actually handles and set a high-entropy webhook secret.
 
-GitHub documents that Apps start with no permissions and should request the minimum required permissions. The repository-dispatch endpoint specifically requires Contents write. See [choosing GitHub App permissions](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/choosing-permissions-for-a-github-app) and [creating a repository dispatch event](https://docs.github.com/en/rest/repos/repos#create-a-repository-dispatch-event).
+GitHub documents that Apps start with no permissions and should request the minimum required permissions. See [choosing GitHub App permissions](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/choosing-permissions-for-a-github-app).
 
-For stricter separation, use one read-only App for webhook and checkout plus a second publisher App with Contents and Pull requests write. The MVP supports the single-App setup but never exposes its token to repository code execution.
+Use a separate publisher App if optional fix branches and pull requests are enabled later. Do not expand the scanning App to Contents write or Pull requests write merely for convenience.
 
 ## 3. Configure secrets
 
-Forgewatch Actions repository secrets:
-
-- `FORGEWATCH_APP_ID`
-- `FORGEWATCH_APP_PRIVATE_KEY`
-
-As a simpler checkout-only alternative, a read-only fine-grained token for the private target can be stored as `FORGEWATCH_TARGET_TOKEN`. That token does not provide webhook dispatch or pull-request publication. Do not configure both approaches unless the fallback is intentional and documented.
+Store the App ID, client ID, client secret, and private key only in the Vercel project's environment variables described in [HOSTED_DASHBOARD.md](HOSTED_DASHBOARD.md). Target repositories need no Forgewatch secret and no personal access token.
 
 Webhook dispatcher secrets, stored in the host's secrets manager:
 
@@ -67,16 +55,14 @@ Place it behind an HTTPS reverse proxy with a request-body limit and rate limit.
 
 [GitHub's webhook validation documentation](https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries) defines the `sha256=` HMAC format implemented here.
 
-## 5. Verify each trigger
+## 5. Verify hosted scanning
 
-1. Run `Forgewatch scan` manually with the workflow's Run workflow button.
+1. Add `.github/workflows/forgewatch.yml` to a test target and start it through the hosted dashboard.
 2. Confirm `scan.json` contains the expected target SHA and all three scanner versions and statuses.
-3. Send a GitHub webhook test delivery and confirm the dispatcher returns HTTP 202.
-4. Push a harmless branch commit and confirm one `repository_dispatch` run starts.
-5. Open or synchronize a test pull request and confirm its head SHA is scanned.
-6. Confirm a duplicate delivery ID is rejected.
-7. Confirm the scheduled workflow runs after 03:17 UTC and scans the default target.
-8. Confirm a deliberately broken scanner produces `incomplete`, a failed check and a report artifact.
+3. Confirm the workflow run appears in the target repository rather than the central Forgewatch repository.
+4. Enable a daily schedule and confirm the Vercel cron starts the target workflow when due.
+5. Confirm the scheduled workflow runs after 03:17 UTC and scans the selected target.
+6. Confirm a deliberately broken scanner produces `incomplete`, a failed check and a report artifact.
 
 Do not call monitoring active before these checks pass in the real repositories.
 
