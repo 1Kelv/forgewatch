@@ -106,7 +106,19 @@ jobs:
           owner: ${{ env.TARGET_OWNER }}
           repositories: ${{ env.TARGET_NAME }}
 
-      - name: Check out the immutable target revision
+      - name: Check out Forgewatch as the target
+        if: env.TARGET_REPOSITORY == github.repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: ${{ env.TARGET_REPOSITORY }}
+          ref: ${{ env.TARGET_REVISION }}
+          token: ${{ github.token }}
+          path: target
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check out another target repository
+        if: env.TARGET_REPOSITORY != github.repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: ${{ env.TARGET_REPOSITORY }}
