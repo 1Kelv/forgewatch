@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type User = { login: string; name: string; avatarUrl: string };
 type Repository = {
@@ -78,6 +78,8 @@ export function Dashboard({ appSlug }: { appSlug: string }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [repositoriesLoading, setRepositoriesLoading] = useState(false);
+  const [monitorsOpen, setMonitorsOpen] = useState(false);
+  const previousMonitorAttention = useRef(false);
   const [report, setReport] = useState<{ name: string; text: string } | null>(null);
 
   const loadMonitors = useCallback(async () => {
@@ -145,6 +147,16 @@ export function Dashboard({ appSlug }: { appSlug: string }) {
     setRepository(first?.url || "");
     setBranch(first?.defaultBranch || "main");
   }, [repositories, repository]);
+
+  useEffect(() => {
+    const needsAttention = monitors.some((item) => {
+      if (item.lastError || !item.run) return true;
+      return item.run.status !== "completed" || item.run.conclusion !== "success";
+    });
+    if (needsAttention && !previousMonitorAttention.current) setMonitorsOpen(true);
+    if (!needsAttention && previousMonitorAttention.current) setMonitorsOpen(false);
+    previousMonitorAttention.current = needsAttention;
+  }, [monitors]);
 
   const matchingRepository = useMemo(
     () =>
@@ -306,27 +318,35 @@ export function Dashboard({ appSlug }: { appSlug: string }) {
       </section>
 
       <section className="repositorySection">
-        <div className="sectionHeading"><div><p className="step">Monitoring</p><h2>Your repositories</h2></div><span>{monitors.length} connected</span></div>
-        <div className="cards">
-          {monitors.map((item) => {
-            const status = statusLabel(item);
-            return (
-              <article className="repoCard" key={item.repositoryId}>
-                <div className="repoTop"><div><p className="repoName">{item.repositoryFullName}</p><p className="branch">Branch: {item.scanBranch}</p></div><span className={`status ${status.tone}`}>{status.label}</span></div>
-                <div className="facts"><div><span>Last started</span><strong>{readableDate(item.lastStartedAt)}</strong></div><div><span>Next scan</span><strong>{readableDate(item.nextScanAt)}</strong></div></div>
-                {item.lastError && <p className="inlineError">{item.lastError}</p>}
-                <label className="frequencyField">Frequency<select value={item.frequency} onChange={(event) => void changeFrequency(item, event.target.value as Frequency)}>{Object.entries(frequencyLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-                <div className="cardActions">
-                  <button className="button primary compact" disabled={busy} onClick={() => void queueScan(`https://github.com/${item.repositoryFullName}`, item.scanBranch, item.frequency)}>Scan again</button>
-                  {item.run?.status === "completed" && <button className="button secondary compact" disabled={busy} onClick={() => void viewReport(item)}>View report</button>}
-                  {item.lastRunUrl && <a className="textLink" href={item.lastRunUrl} target="_blank" rel="noreferrer">Open in GitHub</a>}
-                  <button className="textButton danger" onClick={() => void remove(item)}>Remove</button>
-                </div>
-              </article>
-            );
-          })}
-          {!monitors.length && <div className="empty repositoryEmpty"><h3>No scans have been started</h3><p>Choose a repository above. It will appear here as soon as its first scan is queued.</p></div>}
-        </div>
+        {monitors.length ? (
+          <details className="repositoryDrawer" open={monitorsOpen} onToggle={(event) => setMonitorsOpen(event.currentTarget.open)}>
+            <summary>
+              <div><p className="step">Monitoring</p><h2>Scanned repositories</h2></div>
+              <span className="drawerMeta">{monitors.length} connected <span className="drawerAction">Show or hide</span></span>
+            </summary>
+            <div className="cards">
+              {monitors.map((item) => {
+                const status = statusLabel(item);
+                return (
+                  <article className="repoCard" key={item.repositoryId}>
+                    <div className="repoTop"><div><p className="repoName">{item.repositoryFullName}</p><p className="branch">Branch: {item.scanBranch}</p></div><span className={`status ${status.tone}`}>{status.label}</span></div>
+                    <div className="facts"><div><span>Last started</span><strong>{readableDate(item.lastStartedAt)}</strong></div><div><span>Next scan</span><strong>{readableDate(item.nextScanAt)}</strong></div></div>
+                    {item.lastError && <p className="inlineError">{item.lastError}</p>}
+                    <label className="frequencyField">Frequency<select value={item.frequency} onChange={(event) => void changeFrequency(item, event.target.value as Frequency)}>{Object.entries(frequencyLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+                    <div className="cardActions">
+                      <button className="button primary compact" disabled={busy} onClick={() => void queueScan(`https://github.com/${item.repositoryFullName}`, item.scanBranch, item.frequency)}>Scan again</button>
+                      {item.run?.status === "completed" && <button className="button secondary compact" disabled={busy} onClick={() => void viewReport(item)}>View report</button>}
+                      {item.lastRunUrl && <a className="textLink" href={item.lastRunUrl} target="_blank" rel="noreferrer">Open in GitHub</a>}
+                      <button className="textButton danger" onClick={() => void remove(item)}>Remove</button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </details>
+        ) : (
+          <div className="empty repositoryEmpty"><h3>No scans have been started</h3><p>Choose a repository above. It will appear here as soon as its first scan is queued.</p></div>
+        )}
       </section>
 
       {report && <div className="modalBackdrop" role="presentation" onMouseDown={() => setReport(null)}><section className="reportModal" role="dialog" aria-modal="true" aria-labelledby="report-title" onMouseDown={(event) => event.stopPropagation()}><div className="reportHeader"><div><p className="step">Latest report</p><h2 id="report-title">{report.name}</h2></div><button className="button secondary compact" onClick={() => setReport(null)}>Close</button></div><pre>{report.text}</pre></section></div>}

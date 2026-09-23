@@ -137,7 +137,7 @@ Local recurring scans run only while the dashboard server is open. GitHub Action
 
 ## Use the hosted dashboard
 
-The hosted dashboard is the recommended interface for phone and multi-repository use. It lists repositories approved through the signed-in user's GitHub App installations, refreshes the list after repository access changes, starts the existing `Forgewatch scan` workflow, saves daily or weekly monitoring choices, and displays the uploaded plain-English report. The central automation repository is not offered as a scan target.
+The hosted dashboard is the recommended interface for phone and multi-repository use. It lists repositories approved through the signed-in user's GitHub App installations, refreshes the list after repository access changes, starts the existing `Forgewatch scan` workflow, saves daily or weekly monitoring choices, and displays the uploaded plain-English report. The central automation repository is not offered as a scan target. Completed repositories are kept in a collapsible monitoring section so a growing scan history does not overwhelm the page.
 
 Its source is under `web/`. Follow [the hosted dashboard guide](docs/HOSTED_DASHBOARD.md) to create the GitHub App credentials, database, and Vercel deployment. The Python dashboard remains available for local, folder-based scanning.
 
