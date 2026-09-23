@@ -1,0 +1,31 @@
+{
+  "name": "forgewatch-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "tsx --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "fflate": "0.8.3",
+    "jose": "6.2.12",
+    "next": "16.3.6",
+    "postgres": "3.4.9",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3"
+  },
+  "overrides": {
+    "esbuild": "0.28.2"
+  }
+}

@@ -8,9 +8,10 @@ The first configured target is `1Kelv/sentinel`, but Forgewatch is a separate Gi
 
 ## Current status
 
-This repository contains a working local MVP and GitHub Actions automation, not a public hosted service.
+This repository contains a working local MVP, GitHub Actions automation, and a Vercel-ready hosted dashboard. The hosted dashboard still needs GitHub App credentials, a PostgreSQL database, and a first deployment before it is publicly reachable.
 
 - The local dashboard can register repositories, run scans, show plain-English reports, and schedule recurring local scans.
+- The hosted dashboard under `web/` uses GitHub URLs instead of folder paths, works on phones, and can scan repositories where its GitHub App is installed.
 - Local scanning and the deliberately vulnerable demonstration fixture are working.
 - The GitHub Actions test and scan workflows are included. A scan of Forgewatch itself or another public repository does not require a GitHub App.
 - GitHub App webhook handling is implemented but is not active until an App, secrets, and an HTTPS host are configured.
@@ -133,6 +134,12 @@ To scan a repository:
 The dashboard remembers repository choices in `.forgewatch/dashboard.json`. Reports are written under `.forgewatch/artifacts/dashboard/`. Both locations are ignored by Git and remain outside every target repository.
 
 Local recurring scans run only while the dashboard server is open. GitHub Actions schedules run independently in GitHub and are the better choice for always-on monitoring.
+
+## Use the hosted dashboard
+
+The hosted dashboard is the recommended interface for phone and multi-repository use. It accepts a GitHub repository URL, verifies GitHub App access, starts the existing `Forgewatch scan` workflow, saves daily or weekly monitoring choices, and displays the uploaded plain-English report.
+
+Its source is under `web/`. Follow [the hosted dashboard guide](docs/HOSTED_DASHBOARD.md) to create the GitHub App credentials, database, and Vercel deployment. The Python dashboard remains available for local, folder-based scanning.
 
 ## Scan any local repository
 
@@ -383,7 +390,7 @@ Repository permissions for the single-App MVP:
 - Metadata: read-only, supplied automatically by GitHub.
 - Contents: read and write. Read checks out repositories; write is needed for repository dispatch and optional fix branches.
 - Pull requests: read and write for pull-request events and optional reviewed fix pull requests.
-- Actions: read-only only if the hosted controller will inspect workflow runs.
+- Actions: read and write when the hosted controller starts and inspects workflow runs.
 
 Subscribe to `push` and `pull_request` events. Select the minimum permissions required and install the App only on `forgewatch` and `sentinel`.
 
@@ -562,5 +569,6 @@ After this repair, completed scans with findings are shown as successful runs wi
 - [Architecture and threat model](docs/ARCHITECTURE.md)
 - [Coverage, scanner choices, and licences](docs/COVERAGE.md)
 - [GitHub App setup and deployment](docs/GITHUB_APP.md)
+- [Hosted dashboard on Vercel](docs/HOSTED_DASHBOARD.md)
 - [Operations, scheduling, and costs](docs/OPERATIONS.md)
 - [Current limitations](docs/LIMITATIONS.md)

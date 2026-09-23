@@ -7,3 +7,8 @@ __pycache__/
 *.egg-info/
 build/
 dist/
+web/.env*
+!web/.env.example
+web/.next/
+web/node_modules/
+web/*.tsbuildinfo

@@ -23,7 +23,7 @@ Repository permissions required for the complete workflow:
 - Metadata: read-only, implicit.
 - Contents: read and write. Read is used to check out targets. Write is required by GitHub's repository-dispatch endpoint and by optional fix branches.
 - Pull requests: read and write. Read enables pull-request webhook payloads. Write is used only by the explicit `publish-pr` controller command.
-- Actions: read-only, if required to inspect dispatched workflow runs in the hosted controller.
+- Actions: read and write when the hosted controller starts and inspects workflow runs.
 
 Subscribe to `push` and `pull_request` events. Set a high-entropy webhook secret and the webhook URL to `https://YOUR_HOST/github/webhook`.
 
