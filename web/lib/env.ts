@@ -38,6 +38,11 @@ export function allowedGitHubLogins(): Set<string> {
   );
 }
 
+export function isGitHubLoginAllowed(login: string): boolean {
+  const allowed = allowedGitHubLogins();
+  return allowed.has("*") || allowed.has(login.trim().toLowerCase());
+}
+
 export function sessionSecret(): string {
   const value = required("SESSION_SECRET");
   if (value.length < 32) throw new Error("SESSION_SECRET must contain at least 32 characters.");

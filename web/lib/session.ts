@@ -3,7 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { EncryptJWT, jwtDecrypt } from "jose";
 
-import { allowedGitHubLogins, githubAppEnv, sessionSecret } from "@/lib/env";
+import { githubAppEnv, isGitHubLoginAllowed, sessionSecret } from "@/lib/env";
 
 const SESSION_COOKIE = "forgewatch_session";
 const STATE_COOKIE = "forgewatch_oauth_state";
@@ -106,7 +106,7 @@ export async function requireSession(): Promise<Session> {
       throw new Error("Your GitHub session expired. Sign in again.");
     }
   }
-  if (!allowedGitHubLogins().has(session.login.toLowerCase())) {
+  if (!isGitHubLoginAllowed(session.login)) {
     await clearSession();
     throw new Error("This GitHub account is not allowed to use this Forgewatch dashboard.");
   }

@@ -61,6 +61,8 @@ label { display: flex; flex-direction: column; gap: 7px; color: #394941; font-si
 input, select { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid #cdd8d2; border-radius: 8px; background: white; color: var(--ink); outline: none; }
 input:focus, select:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(23, 107, 74, 0.11); }
 label small { color: var(--muted); font-weight: 450; }
+.fieldHelp { min-height: 24px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.fieldHelp .textButton { flex: 0 0 auto; }
 .scanButton { min-width: 112px; }
 
 .message { margin-bottom: 18px; padding: 13px 15px; border: 1px solid; border-radius: 9px; font-size: 14px; }

@@ -6,6 +6,8 @@ import { automationRepository, githubAppEnv } from "@/lib/env";
 
 const API = "https://api.github.com";
 const API_VERSION = "2026-03-10";
+const PAGE_SIZE = 100;
+const MAX_PAGES = 20;
 
 type GitHubRepository = {
   id: number;
@@ -69,17 +71,33 @@ export async function getGitHubUser(token: string) {
 }
 
 export async function listAvailableRepositories(userToken: string): Promise<AvailableRepository[]> {
-  const installations = await githubFetch<{ installations: Array<{ id: number }> }>(
-    "/user/installations?per_page=100",
-    userToken,
-  );
+  const installations: Array<{ id: number }> = [];
+  for (let page = 1; page <= MAX_PAGES; page += 1) {
+    const value = await githubFetch<{ installations: Array<{ id: number }> }>(
+      `/user/installations?per_page=${PAGE_SIZE}&page=${page}`,
+      userToken,
+    );
+    installations.push(...value.installations);
+    if (value.installations.length < PAGE_SIZE) break;
+    if (page === MAX_PAGES) {
+      throw new Error("Too many GitHub App installations were returned. Contact the Forgewatch operator.");
+    }
+  }
   const groups = await Promise.all(
-    installations.installations.map(async (installation) => {
-      const value = await githubFetch<{ repositories: GitHubRepository[] }>(
-        `/user/installations/${installation.id}/repositories?per_page=100`,
-        userToken,
-      );
-      return value.repositories.map((repository) => ({
+    installations.map(async (installation) => {
+      const repositories: GitHubRepository[] = [];
+      for (let page = 1; page <= MAX_PAGES; page += 1) {
+        const value = await githubFetch<{ repositories: GitHubRepository[] }>(
+          `/user/installations/${installation.id}/repositories?per_page=${PAGE_SIZE}&page=${page}`,
+          userToken,
+        );
+        repositories.push(...value.repositories);
+        if (value.repositories.length < PAGE_SIZE) break;
+        if (page === MAX_PAGES) {
+          throw new Error("Too many approved repositories were returned. Contact the Forgewatch operator.");
+        }
+      }
+      return repositories.map((repository) => ({
         id: repository.id,
         installationId: installation.id,
         fullName: repository.full_name,
@@ -90,7 +108,12 @@ export async function listAvailableRepositories(userToken: string): Promise<Avai
       }));
     }),
   );
-  return groups.flat().sort((left, right) => left.fullName.localeCompare(right.fullName));
+  const automation = automationRepository();
+  const automationName = `${automation.owner}/${automation.repository}`.toLowerCase();
+  return groups
+    .flat()
+    .filter((repository) => repository.fullName.toLowerCase() !== automationName)
+    .sort((left, right) => left.fullName.localeCompare(right.fullName));
 }
 
 export async function findAvailableRepository(

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { allowedGitHubLogins, appUrl, githubAppEnv } from "@/lib/env";
+import { appUrl, githubAppEnv, isGitHubLoginAllowed } from "@/lib/env";
 import { getGitHubUser } from "@/lib/github";
 import { consumeOAuthState, saveSession } from "@/lib/session";
 
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
       throw new Error(token.error_description || "GitHub sign-in failed.");
     }
     const user = await getGitHubUser(token.access_token);
-    if (!allowedGitHubLogins().has(user.login.toLowerCase())) {
+    if (!isGitHubLoginAllowed(user.login)) {
       throw new Error("This GitHub account is not allowed to use this Forgewatch dashboard.");
     }
     await saveSession({

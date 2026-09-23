@@ -77,11 +77,22 @@ export function Dashboard({ appSlug }: { appSlug: string }) {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [repositoriesLoading, setRepositoriesLoading] = useState(false);
   const [report, setReport] = useState<{ name: string; text: string } | null>(null);
 
   const loadMonitors = useCallback(async () => {
     const value = await api<{ monitors: Monitor[] }>("/api/scans");
     setMonitors(value.monitors);
+  }, []);
+
+  const loadRepositories = useCallback(async () => {
+    setRepositoriesLoading(true);
+    try {
+      const value = await api<{ repositories: Repository[] }>("/api/repositories");
+      setRepositories(value.repositories);
+    } finally {
+      setRepositoriesLoading(false);
+    }
   }, []);
 
   const load = useCallback(async () => {
@@ -93,23 +104,13 @@ export function Dashboard({ appSlug }: { appSlug: string }) {
         return;
       }
       setUser(session.user);
-      const [repositoryValue] = await Promise.all([
-        api<{ repositories: Repository[] }>("/api/repositories"),
-        loadMonitors(),
-      ]);
-      setRepositories(repositoryValue.repositories);
-      if (repositoryValue.repositories[0]) {
-        setRepository((current) => current || repositoryValue.repositories[0].url);
-        setBranch((current) =>
-          current === "main" ? repositoryValue.repositories[0].defaultBranch : current,
-        );
-      }
+      await Promise.all([loadRepositories(), loadMonitors()]);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "The dashboard could not load.");
     } finally {
       setLoading(false);
     }
-  }, [loadMonitors]);
+  }, [loadMonitors, loadRepositories]);
 
   useEffect(() => {
     const query = new URLSearchParams(window.location.search);
@@ -126,6 +127,24 @@ export function Dashboard({ appSlug }: { appSlug: string }) {
     const interval = window.setInterval(() => void loadMonitors().catch(() => undefined), 15_000);
     return () => window.clearInterval(interval);
   }, [loadMonitors, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const refreshAfterGitHub = () => {
+      void loadRepositories().catch((cause) => {
+        setError(cause instanceof Error ? cause.message : "The repository list could not be refreshed.");
+      });
+    };
+    window.addEventListener("focus", refreshAfterGitHub);
+    return () => window.removeEventListener("focus", refreshAfterGitHub);
+  }, [loadRepositories, user]);
+
+  useEffect(() => {
+    if (repositories.some((item) => item.url.toLowerCase() === repository.toLowerCase())) return;
+    const first = repositories[0];
+    setRepository(first?.url || "");
+    setBranch(first?.defaultBranch || "main");
+  }, [repositories, repository]);
 
   const matchingRepository = useMemo(
     () =>
@@ -257,7 +276,7 @@ export function Dashboard({ appSlug }: { appSlug: string }) {
 
       <header className="pageHeader">
         <div><p className="eyebrow">Security overview</p><h1>Repository dashboard</h1><p>Start a scan, change a schedule, or open the latest plain-English report.</p></div>
-        {appSlug && <a className="button secondary compact" href={`https://github.com/apps/${appSlug}/installations/new`}>Manage repository access</a>}
+        {appSlug && <a className="button secondary compact" href={`https://github.com/apps/${appSlug}/installations/new`} target="_blank" rel="noreferrer">Manage repository access</a>}
       </header>
 
       {error && <div className="message error" role="alert">{error}</div>}
@@ -267,17 +286,22 @@ export function Dashboard({ appSlug }: { appSlug: string }) {
         <div className="panelHeading"><div><p className="step">New scan</p><h2>Choose a GitHub repository</h2></div><span className="safeNote">Only approved repositories are available</span></div>
         {repositories.length ? (
           <form className="scanForm" onSubmit={startScan}>
-            <label className="wide">Repository URL
-              <input list="repositories" value={repository} onChange={(event) => chooseRepository(event.target.value)} placeholder="https://github.com/owner/repository" required />
-              <datalist id="repositories">{repositories.map((item) => <option key={item.id} value={item.url}>{item.fullName}</option>)}</datalist>
-              <small>{matchingRepository ? `${matchingRepository.private ? "Private" : "Public"} repository connected` : "Paste an installed GitHub repository URL"}</small>
+            <label className="wide">Repository
+              <select value={repository} onChange={(event) => chooseRepository(event.target.value)} required>
+                <option value="" disabled>Select an approved repository</option>
+                {repositories.map((item) => <option key={item.id} value={item.url}>{item.fullName} ({item.private ? "private" : "public"})</option>)}
+              </select>
+              <span className="fieldHelp">
+                <small>{matchingRepository ? `${matchingRepository.private ? "Private" : "Public"} repository connected` : "Choose a repository approved in GitHub"}</small>
+                <button className="textButton" type="button" disabled={repositoriesLoading} onClick={() => void loadRepositories().catch((cause) => setError(cause instanceof Error ? cause.message : "The repository list could not be refreshed."))}>{repositoriesLoading ? "Refreshing" : "Refresh list"}</button>
+              </span>
             </label>
             <label>Branch<input value={branch} onChange={(event) => setBranch(event.target.value)} required /></label>
             <label>Scan frequency<select value={frequency} onChange={(event) => setFrequency(event.target.value as Frequency)}>{Object.entries(frequencyLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
             <button className="button primary scanButton" disabled={busy}>{busy ? "Starting scan" : "Run scan"}</button>
           </form>
         ) : (
-          <div className="empty"><h3>No repositories are connected yet</h3><p>Install Forgewatch and choose the repositories it may scan. Return here afterwards and they will appear automatically.</p>{appSlug && <a className="button primary" href={`https://github.com/apps/${appSlug}/installations/new`}>Choose repositories</a>}</div>
+          <div className="empty"><h3>No scan targets are connected yet</h3><p>Choose repositories in GitHub, then return to this tab. The private Forgewatch worker is intentionally hidden from this list.</p>{appSlug && <a className="button primary" href={`https://github.com/apps/${appSlug}/installations/new`} target="_blank" rel="noreferrer">Choose repositories</a>}</div>
         )}
       </section>
 

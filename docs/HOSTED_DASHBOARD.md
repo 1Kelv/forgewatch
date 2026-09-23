@@ -15,7 +15,7 @@ The hosted dashboard never accepts a local folder path. A pasted value must be a
 - A daily scheduler endpoint protected by `CRON_SECRET`.
 - PostgreSQL storage for repository choices, schedules, and run IDs.
 
-The first deployment is restricted to the GitHub names in `FORGEWATCH_ALLOWED_GITHUB_LOGINS`. Keep this allow-list in place until account administration, rate limits, usage limits, and billing controls exist.
+The first deployment is restricted to the GitHub names in `FORGEWATCH_ALLOWED_GITHUB_LOGINS`. Use a comma-separated list for invited testers. The special value `*` permits any GitHub user to sign in, but should only be enabled deliberately after reviewing usage limits and the GitHub App's public installation settings.
 
 ## 1. Create the initial Vercel project
 
@@ -104,6 +104,20 @@ FORGEWATCH_ALLOWED_GITHUB_LOGINS=1Kelv
 ```
 
 Set `APP_URL` to the production address from step 1. Enter the GitHub private key as the complete PEM text. Vercel stores environment variables outside the repository.
+
+For an invite-only beta, add GitHub names with commas:
+
+```text
+FORGEWATCH_ALLOWED_GITHUB_LOGINS=1Kelv,another-user
+```
+
+To permit any GitHub user to sign in, use:
+
+```text
+FORGEWATCH_ALLOWED_GITHUB_LOGINS=*
+```
+
+Repository choices are still limited to installations and repositories that the signed-in user is explicitly allowed to access. The central automation repository is hidden from the scan target selector.
 
 Redeploy the project. Environment-variable changes do not affect an earlier deployment until a new deployment is created.
 

@@ -8,7 +8,7 @@ Forgewatch is independent from every repository it scans. It can scan any author
 
 ## Current status
 
-This repository contains a working local MVP, GitHub Actions automation, and a Vercel-ready hosted dashboard. The hosted dashboard still needs GitHub App credentials, a PostgreSQL database, and a first deployment before it is publicly reachable.
+This repository contains a working local MVP, GitHub Actions automation, and a Vercel-ready hosted dashboard. A new hosted installation needs GitHub App credentials, a PostgreSQL database, and a Vercel deployment.
 
 - The local dashboard can register repositories, run scans, show plain-English reports, and schedule recurring local scans.
 - The hosted dashboard under `web/` uses GitHub URLs instead of folder paths, works on phones, and can scan repositories where its GitHub App is installed.
@@ -137,7 +137,7 @@ Local recurring scans run only while the dashboard server is open. GitHub Action
 
 ## Use the hosted dashboard
 
-The hosted dashboard is the recommended interface for phone and multi-repository use. It accepts a GitHub repository URL, verifies GitHub App access, starts the existing `Forgewatch scan` workflow, saves daily or weekly monitoring choices, and displays the uploaded plain-English report.
+The hosted dashboard is the recommended interface for phone and multi-repository use. It lists repositories approved through the signed-in user's GitHub App installations, refreshes the list after repository access changes, starts the existing `Forgewatch scan` workflow, saves daily or weekly monitoring choices, and displays the uploaded plain-English report. The central automation repository is not offered as a scan target.
 
 Its source is under `web/`. Follow [the hosted dashboard guide](docs/HOSTED_DASHBOARD.md) to create the GitHub App credentials, database, and Vercel deployment. The Python dashboard remains available for local, folder-based scanning.
 
@@ -500,7 +500,7 @@ For the internal MVP, another owner has three options:
 
 1. Local use: clone Forgewatch, clone any repository they are allowed to read, add its folder in the dashboard, and run a manual or recurring local scan.
 2. Self-host: clone or fork Forgewatch, create their own GitHub App, install it only on selected repositories, configure the allow-list and secrets, and run the same workflows.
-3. Hosted onboarding: install the Forgewatch App on selected repositories, then choose the repository in the hosted dashboard.
+3. Hosted onboarding: install the Forgewatch App on selected repositories, return to the hosted dashboard, refresh the repository list, then choose the target.
 
 After onboarding, their normal workflow is simple:
 
@@ -510,7 +510,7 @@ After onboarding, their normal workflow is simple:
 4. Review any proposed patch and its before-and-after checks.
 5. Merge only after a person approves it.
 
-The hosted dashboard now provides installation sign-in and tenant-aware repository selection. Wider public use still needs account administration, rate limits, usage controls, billing, and GitHub Check results or a dedicated report-sharing flow.
+The hosted dashboard provides installation sign-in and tenant-aware repository selection. `FORGEWATCH_ALLOWED_GITHUB_LOGINS` accepts comma-separated GitHub names for an invite-only beta and `*` for deliberately enabled public sign-in. Wider public use still needs rate limits, usage controls, billing, and GitHub Check results or a dedicated report-sharing flow.
 
 ## Pull-request handoff
 
