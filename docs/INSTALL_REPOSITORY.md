@@ -13,6 +13,12 @@ The workflow runs inside the target repository's own GitHub Actions area. Its lo
 
 ## Add the workflow using the GitHub website
 
+The easiest path is to select your repository in the dashboard and open `Repository setup guide`. The guide automatically uses that repository's owner, name, and default branch. Click `Copy workflow`, then `Create workflow on GitHub`. The second button opens the correct file creation page with `.github/workflows/forgewatch.yml` already filled in. Paste the copied text into the large editor, select `Commit changes`, and save it to the default branch. Return to the dashboard and select `Run scan`.
+
+For example, for `YOUR-NAME/YOUR-PROJECT` on `main`, the guide links to `https://github.com/YOUR-NAME/YOUR-PROJECT/new/main?filename=.github%2Fworkflows%2Fforgewatch.yml`. You do not need to construct this URL yourself. If you open `/setup` directly, enter your repository URL to generate your own link.
+
+If you prefer to create the file manually, follow these steps:
+
 1. Open the repository you want to scan on GitHub.
 2. Open its `Code` tab.
 3. Select `Add file`, then `Create new file`.

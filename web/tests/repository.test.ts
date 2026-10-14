@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { nextScanAt, parseGitHubRepository, validateBranch } from "../lib/repository";
+import { nextScanAt, parseGitHubRepository, repositorySetupUrl, validateBranch, workflowCreationUrl } from "../lib/repository";
 import { isGitHubLoginAllowed } from "../lib/env";
 import { runRepositoryFullName } from "../lib/monitors";
 import { targetWorkflow } from "../lib/setup-workflow";
@@ -23,6 +23,25 @@ test("validates branches without accepting revision traversal", () => {
   assert.equal(validateBranch("feature/report-ui"), "feature/report-ui");
   assert.throws(() => validateBranch("feature/../main"));
   assert.throws(() => validateBranch("main; touch file"));
+});
+
+test("setup links use the selected owner's repository and default branch", () => {
+  const guide = new URL(repositorySetupUrl("https://github.com/friend/widget", "develop"), "https://forgewatch.example");
+  assert.equal(guide.pathname, "/setup");
+  assert.equal(guide.searchParams.get("repository"), "friend/widget");
+  assert.equal(guide.searchParams.get("default_branch"), "develop");
+
+  const github = new URL(workflowCreationUrl("friend/widget", "develop"));
+  assert.equal(github.origin, "https://github.com");
+  assert.equal(github.pathname, "/friend/widget/new/develop");
+  assert.equal(github.searchParams.get("filename"), ".github/workflows/forgewatch.yml");
+});
+
+test("setup links preserve branch slashes and reject invalid destinations", () => {
+  const github = new URL(workflowCreationUrl("team/widget", "release/stable"));
+  assert.equal(decodeURIComponent(github.pathname), "/team/widget/new/release/stable");
+  assert.throws(() => workflowCreationUrl("https://example.com/owner/repo", "main"));
+  assert.throws(() => workflowCreationUrl("owner/repo", "main?unexpected=value"));
 });
 
 test("calculates daily and weekly schedules", () => {

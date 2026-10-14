@@ -2,6 +2,8 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { parseGitHubRepository, repositorySetupUrl } from "@/lib/repository";
+
 type User = { login: string; name: string; avatarUrl: string };
 type Repository = {
   id: number;
@@ -76,10 +78,12 @@ export function Dashboard({ appSlug }: { appSlug: string }) {
   const [frequency, setFrequency] = useState<Frequency>("manual");
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [errorSetupUrl, setErrorSetupUrl] = useState("/setup");
   const [busy, setBusy] = useState(false);
   const [repositoriesLoading, setRepositoriesLoading] = useState(false);
   const [monitorsOpen, setMonitorsOpen] = useState(false);
   const previousMonitorAttention = useRef(false);
+  const requestedRepository = useRef<string | null>(null);
   const [report, setReport] = useState<{ name: string; text: string } | null>(null);
   const workflowSetupNeeded = error.toLowerCase().includes("workflow is not installed");
 
@@ -117,6 +121,14 @@ export function Dashboard({ appSlug }: { appSlug: string }) {
 
   useEffect(() => {
     const query = new URLSearchParams(window.location.search);
+    const requested = query.get("repository");
+    if (requested) {
+      try {
+        requestedRepository.current = parseGitHubRepository(requested);
+      } catch {
+        // Ignore an invalid selection hint; available repositories still come from GitHub.
+      }
+    }
     const loginError = query.get("error");
     if (loginError) {
       setError(loginError);
@@ -143,6 +155,17 @@ export function Dashboard({ appSlug }: { appSlug: string }) {
   }, [loadRepositories, user]);
 
   useEffect(() => {
+    if (repositories.length && requestedRepository.current) {
+      const requested = repositories.find(
+        (item) => item.fullName.toLowerCase() === requestedRepository.current?.toLowerCase(),
+      );
+      requestedRepository.current = null;
+      if (requested) {
+        setRepository(requested.url);
+        setBranch(requested.defaultBranch);
+        return;
+      }
+    }
     if (repositories.some((item) => item.url.toLowerCase() === repository.toLowerCase())) return;
     const first = repositories[0];
     setRepository(first?.url || "");
@@ -168,6 +191,9 @@ export function Dashboard({ appSlug }: { appSlug: string }) {
       ),
     [repositories, repository],
   );
+  const selectedSetupUrl = matchingRepository
+    ? repositorySetupUrl(matchingRepository.fullName, matchingRepository.defaultBranch)
+    : "/setup";
 
   function chooseRepository(value: string) {
     setRepository(value);
@@ -177,10 +203,17 @@ export function Dashboard({ appSlug }: { appSlug: string }) {
     if (selected) setBranch(selected.defaultBranch);
   }
 
-  async function queueScan(selectedRepository: string, selectedBranch: string, selectedFrequency: Frequency) {
+  async function queueScan(selectedRepository: string, selectedBranch: string, selectedFrequency: Frequency, defaultBranch?: string) {
     setBusy(true);
     setError("");
     setNotice("");
+    const target = repositories.find(
+      (item) => item.url.toLowerCase() === selectedRepository.toLowerCase()
+        || item.fullName.toLowerCase() === selectedRepository.toLowerCase(),
+    );
+    setErrorSetupUrl(target
+      ? repositorySetupUrl(target.fullName, target.defaultBranch)
+      : defaultBranch ? repositorySetupUrl(selectedRepository, defaultBranch) : "/setup");
     try {
       const value = await api<{ message: string; run: { url: string } }>("/api/scans", {
         method: "POST",
@@ -290,12 +323,12 @@ export function Dashboard({ appSlug }: { appSlug: string }) {
       <header className="pageHeader">
         <div><p className="eyebrow">Security overview</p><h1>Repository dashboard</h1><p>Start a scan, change a schedule, or open the latest plain-English report.</p></div>
         <div className="headerActions">
-          <a className="button secondary compact" href="/setup">Repository setup guide</a>
+          <a className="button secondary compact" href={selectedSetupUrl}>Repository setup guide</a>
           {appSlug && <a className="button secondary compact" href={`https://github.com/apps/${appSlug}/installations/new`} target="_blank" rel="noreferrer">Manage repository access</a>}
         </div>
       </header>
 
-      {error && <div className="message error" role="alert">{error}{workflowSetupNeeded && <a className="messageLink" href="/setup">Open the setup guide</a>}</div>}
+      {error && <div className="message error" role="alert">{error}{workflowSetupNeeded && <a className="messageLink" href={errorSetupUrl}>Set up this repository</a>}</div>}
       {notice && <div className="message success" role="status">{notice}</div>}
 
       <section className="panel scanPanel">
@@ -319,7 +352,7 @@ export function Dashboard({ appSlug }: { appSlug: string }) {
         ) : (
           <div className="empty"><h3>No scan targets are connected yet</h3><p>Choose repositories in GitHub, then return to this tab. The private Forgewatch worker is intentionally hidden from this list.</p>{appSlug && <a className="button primary" href={`https://github.com/apps/${appSlug}/installations/new`} target="_blank" rel="noreferrer">Choose repositories</a>}</div>
         )}
-        <p className="panelNote">Forgewatch itself is hidden because it supplies the scanner rather than acting as a target. Before a repository&apos;s first scan, <a href="/setup">add its one-time workflow file</a>.</p>
+        <p className="panelNote">First scan? <a href={selectedSetupUrl}>Set up {matchingRepository?.fullName || "your repository"}</a>. The guide opens the correct GitHub page for you to add the scan file. You only need to do this once per repository.</p>
       </section>
 
       <section className="repositorySection">
@@ -339,7 +372,7 @@ export function Dashboard({ appSlug }: { appSlug: string }) {
                     {item.lastError && <p className="inlineError">{item.lastError}</p>}
                     <label className="frequencyField">Frequency<select value={item.frequency} onChange={(event) => void changeFrequency(item, event.target.value as Frequency)}>{Object.entries(frequencyLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
                     <div className="cardActions">
-                      <button className="button primary compact" disabled={busy} onClick={() => void queueScan(`https://github.com/${item.repositoryFullName}`, item.scanBranch, item.frequency)}>Scan again</button>
+                      <button className="button primary compact" disabled={busy} onClick={() => void queueScan(`https://github.com/${item.repositoryFullName}`, item.scanBranch, item.frequency, item.defaultBranch)}>Scan again</button>
                       {item.run?.status === "completed" && <button className="button secondary compact" disabled={busy} onClick={() => void viewReport(item)}>View report</button>}
                       {item.lastRunUrl && <a className="textLink" href={item.lastRunUrl} target="_blank" rel="noreferrer">Open in GitHub</a>}
                       <button className="textButton danger" onClick={() => void remove(item)}>Remove</button>

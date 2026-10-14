@@ -35,6 +35,22 @@ export function validateBranch(value: string): string {
   return branch;
 }
 
+export function repositorySetupUrl(repository: string, defaultBranch: string): string {
+  const query = new URLSearchParams({
+    repository: parseGitHubRepository(repository),
+    default_branch: validateBranch(defaultBranch),
+  });
+  return `/setup?${query}`;
+}
+
+export function workflowCreationUrl(repository: string, defaultBranch: string): string {
+  const fullName = parseGitHubRepository(repository);
+  const branch = validateBranch(defaultBranch);
+  const url = new URL(`https://github.com/${fullName}/new/${encodeURIComponent(branch)}`);
+  url.searchParams.set("filename", ".github/workflows/forgewatch.yml");
+  return url.toString();
+}
+
 export function nextScanAt(frequency: Frequency, from = new Date()): Date | null {
   if (frequency === "manual") return null;
   const nextCron = new Date(

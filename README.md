@@ -141,6 +141,8 @@ The hosted dashboard is the recommended interface for phone and multi-repository
 
 Its source is under `web/`. Follow [the hosted dashboard guide](docs/HOSTED_DASHBOARD.md) to create the GitHub App credentials, database, and Vercel deployment. The Python dashboard remains available for local, folder-based scanning.
 
+The `Repository setup guide` uses the repository selected in the dashboard. Its `Create workflow on GitHub` button opens that owner's repository and default branch with the filename already filled in. The guide explains how to copy the file text, paste it into GitHub's editor, commit it, and return to start the scan.
+
 ## Scan any local repository
 
 For a public GitHub repository:
