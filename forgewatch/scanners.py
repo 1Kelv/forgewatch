@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Tuple
 
 from .models import Finding, Location, ScannerRun
-from .redaction import REDACTED, redact_text
+from .redaction import REDACTED, redact, redact_text
 
 
 SUPPORTED_LOCKFILES = {
@@ -52,7 +52,7 @@ def _run(command: List[str], cwd: Path, timeout: int) -> Tuple[int, str, str, in
         )
         return (
             process.returncode,
-            redact_text(process.stdout),
+            _redact_scanner_stdout(process.stdout),
             redact_text(process.stderr),
             int((time.monotonic() - started) * 1000),
         )
@@ -83,6 +83,20 @@ def _json(stdout: str) -> Dict[str, Any]:
         if first >= 0 and last > first:
             return json.loads(stdout[first : last + 1])
         raise
+
+
+def _redact_scanner_stdout(stdout: str) -> str:
+    if not stdout.strip():
+        return stdout
+    try:
+        payload = _json(stdout)
+    except (json.JSONDecodeError, ValueError):
+        return redact_text(stdout)
+    if not isinstance(payload, (dict, list)):
+        return redact_text(stdout)
+    # Redacting serialized JSON can remove escapes from quoted advisory examples.
+    # Parse first, redact the values, then let the JSON encoder preserve the structure.
+    return json.dumps(redact(payload), ensure_ascii=False)
 
 
 def _relative(root: Path, value: str) -> str:
