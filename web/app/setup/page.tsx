@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { CopyWorkflowButton } from "@/components/copy-workflow-button";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { parseGitHubRepository, validateBranch, workflowCreationUrl } from "@/lib/repository";
 import { targetWorkflow } from "@/lib/setup-workflow";
 
@@ -42,7 +43,7 @@ export default async function SetupPage({
     <main className="shell setupPage">
       <nav className="nav">
         <a className="brand" href="/"><span className="brandMark">F</span><span>Forgewatch</span></a>
-        <a className="textLink" href={dashboardUrl}>Back to dashboard</a>
+        <div className="navActions"><ThemeToggle /><a className="textLink" href={dashboardUrl}>Back to dashboard</a></div>
       </nav>
 
       <header className="setupHeader">

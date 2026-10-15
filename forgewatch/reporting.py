@@ -113,7 +113,7 @@ def _what_to_do(finding: Finding) -> str:
     return finding.remediation
 
 
-def finding_plain_language(finding: Finding) -> Dict[str, str]:
+def finding_plain_language(finding: Finding) -> Dict[str, Any]:
     return {
         "title": _plain_title(finding),
         "priority": PRIORITY[finding.severity][0],
@@ -121,6 +121,7 @@ def finding_plain_language(finding: Finding) -> Dict[str, str]:
         "why_it_matters": _why_it_matters(finding),
         "what_to_do": _what_to_do(finding),
         "fix_check": VALIDATION.get(finding.validation_status, finding.validation_status),
+        "fix_guidance": finding.fix_guidance,
     }
 
 
@@ -214,6 +215,26 @@ def plain_language(result: ScanResult) -> Dict[str, Any]:
             else "Forgewatch recorded no items for review."
         ),
         "next_step": next_step,
+        "checks": [
+            {
+                "name": CHECK_NAMES.get(run.scanner, run.scanner),
+                "result": CHECK_STATUS.get(run.status, run.status),
+                "coverage": _plain_coverage(run.scanner, run.coverage),
+                "reason": _plain_scanner_error(run.scanner, run.error) if run.error else "",
+            }
+            for run in result.scanner_runs
+        ],
+        "closing_summary": {
+            "headline": "Your next steps",
+            "text": (f"{len(result.findings)} {'item needs' if len(result.findings) == 1 else 'items need'} review. " if result.findings else "No items were recorded. ") + next_step,
+            "steps": [
+                *(["Resolve the unfinished checks before treating this scan as complete."] if result.status == "incomplete" else []),
+                *(["Start with urgent and important items, then work through the remaining priorities.",
+                   "Review the suggested fix for each item; do not apply bulk upgrades blindly.",
+                   "Run your project checks after changes and scan the updated branch again."] if result.findings else []),
+                "Keep scanning after code and dependency changes. A clean scan is not a security guarantee.",
+            ],
+        },
         "severity_guide": {severity: {"label": value[0], "meaning": value[1]} for severity, value in PRIORITY.items()},
         "findings": {
             finding.fingerprint: finding_plain_language(finding)
@@ -258,6 +279,8 @@ def markdown(result: ScanResult) -> str:
         name = _safe_markdown(CHECK_NAMES.get(run.scanner, run.scanner))
         status = _safe_markdown(CHECK_STATUS.get(run.status, run.status))
         lines.append(f"| {name} | {status} | {coverage} | {_safe_markdown(run.version)} |")
+    for run in result.scanner_runs:
+        name = _safe_markdown(CHECK_NAMES.get(run.scanner, run.scanner))
         if run.error:
             lines.extend(["", f"> **Why {name.lower()} did not finish:** {_safe_markdown(_plain_scanner_error(run.scanner, run.error))}"])
     lines.extend(["", "<details>", "<summary>Exact technical coverage</summary>", ""])
@@ -296,6 +319,21 @@ def markdown(result: ScanResult) -> str:
                 "",
                 _safe_markdown(_what_to_do(finding)),
                 "",
+            ]
+        )
+        guidance = finding.fix_guidance
+        if guidance.get("steps"):
+            lines.extend(["**Suggested fix for this project**", ""])
+            lines.extend(f"{index}. {_safe_markdown(step)}" for index, step in enumerate(guidance["steps"], 1))
+            lines.extend(["", "**Based on these project details**", ""])
+            lines.extend(f"- {_safe_markdown(item)}" for item in guidance.get("basis", []))
+            if guidance.get("commands"):
+                lines.extend(["", f"**Commands to review and run yourself** (from `{_safe_markdown(guidance.get('working_directory', '.'))}`):", ""])
+                # Inline commands are escaped like every other untrusted project value.
+                lines.extend(f"- `{_safe_markdown(command)}`" for command in guidance["commands"])
+            lines.extend(["", _safe_markdown(guidance.get("disclaimer", "")), ""])
+        lines.extend(
+            [
                 "<details>",
                 "<summary>Technical details for maintainers</summary>",
                 "",
@@ -308,6 +346,9 @@ def markdown(result: ScanResult) -> str:
                 "",
             ]
         )
+    closing = simple["closing_summary"]
+    lines.extend(["## Summary", "", simple["summary"], "", closing["text"], ""])
+    lines.extend(f"- {_safe_markdown(step)}" for step in closing["steps"])
     return str(redact("\n".join(lines))) + "\n"
 
 

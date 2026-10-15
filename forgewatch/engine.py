@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from .models import Finding, ScanResult, ScannerRun
+from .guidance import enrich_guidance
 from .scanners import run_configured_scanner
 
 
@@ -67,6 +68,7 @@ def scan(root: Path, config: Dict[str, Any], trigger: str, ref: str) -> ScanResu
     for missing in sorted(expected - configured):
         runs.append(ScannerRun(missing, "not-run", "skipped", "none", 0, error="scanner is not configured"))
     findings = deduplicate(runs)
+    enrich_guidance(root, findings)
     if any(run.status in {"failed", "skipped"} for run in runs):
         status = "incomplete"
     elif findings:

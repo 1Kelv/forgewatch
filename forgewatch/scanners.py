@@ -257,6 +257,16 @@ def run_osv(root: Path, config: Dict[str, Any]) -> ScannerRun:
                 summary = vulnerability.get("summary") or vulnerability.get("details") or vulnerability_id
                 aliases = vulnerability.get("aliases", []) or []
                 references = [item.get("url") for item in vulnerability.get("references", []) if item.get("url")]
+                fixed_versions = sorted({
+                    event["fixed"]
+                    for affected in vulnerability.get("affected", []) or []
+                    if (affected.get("package", {}) or {}).get("name") == package_name
+                    and (affected.get("package", {}) or {}).get("ecosystem") == package.get("ecosystem")
+                    for affected_range in affected.get("ranges", []) or []
+                    if affected_range.get("type") in {"SEMVER", "ECOSYSTEM"}
+                    for event in affected_range.get("events", []) or []
+                    if isinstance(event.get("fixed"), str)
+                })
                 findings.append(
                     Finding(
                         scanner="osv-scanner",
@@ -270,6 +280,12 @@ def run_osv(root: Path, config: Dict[str, Any]) -> ScannerRun:
                         locations=[Location(path=path)],
                         evidence=f"Affected dependency: {package_name}@{package_version}; advisory: {vulnerability_id}",
                         references=references,
+                        dependency={
+                            "name": package_name,
+                            "version": package_version,
+                            "ecosystem": package.get("ecosystem", ""),
+                            "fixed_versions": fixed_versions,
+                        },
                         source_ids=[f"osv-scanner:{vulnerability_id}", *[f"osv-scanner:{alias}" for alias in aliases]],
                     )
                 )

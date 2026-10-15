@@ -44,6 +44,8 @@ class Finding:
     source_ids: List[str] = field(default_factory=list)
     fingerprint: str = ""
     status: str = "open"
+    dependency: Dict[str, Any] = field(default_factory=dict)
+    fix_guidance: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self.severity = normalise_severity(self.severity)
@@ -70,6 +72,12 @@ class Finding:
         self.source_ids = sorted(set(self.source_ids + other.source_ids))
         self.cwes = sorted(set(self.cwes + other.cwes))
         self.references = sorted(set(self.references + other.references))
+        if not self.dependency:
+            self.dependency = other.dependency.copy()
+        elif other.dependency:
+            self.dependency["fixed_versions"] = sorted(set(
+                self.dependency.get("fixed_versions", []) + other.dependency.get("fixed_versions", [])
+            ))
         known = {(loc.path, loc.start_line, loc.end_line) for loc in self.locations}
         self.locations.extend(
             loc for loc in other.locations if (loc.path, loc.start_line, loc.end_line) not in known

@@ -11,6 +11,25 @@ from forgewatch.scanners import _run, run_osv, run_semgrep
 
 class ScannerFailureTests(unittest.TestCase):
     @patch("forgewatch.scanners._version", return_value="2.5.1")
+    @patch("forgewatch.scanners._run")
+    def test_fixed_versions_belong_to_the_matching_package_and_ecosystem(self, run, _version):
+        payload = {"results": [{"source": {"path": "package-lock.json"}, "packages": [{
+            "package": {"name": "example", "version": "1.0.0", "ecosystem": "npm"},
+            "vulnerabilities": [{"id": "GHSA-example", "affected": [
+                {"package": {"name": "example", "ecosystem": "npm"}, "ranges": [{"type": "SEMVER", "events": [{"introduced": "0"}, {"fixed": "1.0.1"}]}]},
+                {"package": {"name": "example", "ecosystem": "PyPI"}, "ranges": [{"type": "ECOSYSTEM", "events": [{"fixed": "9.0.0"}]}]},
+                {"package": {"name": "other", "ecosystem": "npm"}, "ranges": [{"type": "SEMVER", "events": [{"fixed": "8.0.0"}]}]},
+                {"package": {"name": "example", "ecosystem": "npm"}, "ranges": [{"type": "GIT", "events": [{"fixed": "abcdef"}]}]},
+            ]}],
+        }]}]}
+        run.return_value = (1, json.dumps(payload), "", 10)
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "package-lock.json").write_text("{}")
+            result = run_osv(root, {})
+        self.assertEqual(result.findings[0].dependency["fixed_versions"], ["1.0.1"])
+
+    @patch("forgewatch.scanners._version", return_value="2.5.1")
     @patch("forgewatch.scanners.subprocess.run")
     def test_osv_advisory_examples_are_redacted_without_breaking_json(self, process, _version):
         sample_token = "gh" + "p_" + "A" * 24

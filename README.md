@@ -28,6 +28,25 @@ This repository contains a working local MVP, GitHub Actions automation, and a V
 
 The underlying tools are Semgrep, OSV-Scanner, and Gitleaks. Human reports use ordinary language first. Tool names, rule IDs, and original advisory wording are kept in collapsed technical sections for maintainers.
 
+### Reading reports and following fix advice
+
+The hosted report opens as a formatted, searchable view, not raw Markdown. It includes:
+
+- An at-a-glance result and counts by priority.
+- A short explanation of which checks finished and which did not.
+- Expandable findings, with only ten shown initially. Search by package, file, or issue, filter by priority, and choose **Show 10 more items** when needed.
+- A **How to fix it** section for each finding, plus a link to the affected file at the scanned version.
+- A **Summary and next steps** section at the end. **Skip to summary** jumps directly there.
+- A **Download report** button for the Markdown copy, which also includes headings, lists, fix steps, and a closing summary.
+
+Use **Dark mode** or **Light mode** in the navigation or report header. Your choice is saved in your browser. Without a saved choice, Forgewatch follows your device's appearance setting.
+
+New scans tailor fix advice to the files that were scanned. For JavaScript projects this includes the nearest `package.json`, dependency declarations, package manager, lockfile parent entries where available, and existing test, type-check, lint, and build scripts. Dependency reports retain fixed release boundaries supplied by the matching security advisory. A package brought in by another dependency is explained separately from one declared directly by the project. Other ecosystems receive dependency-file and advisory-based guidance without invented JavaScript commands. Code-pattern findings point to the affected file and explain the relevant edit; possible secrets receive rotation and removal steps without exposing their values.
+
+This advice is evidence-based guidance, not a generated, applied, or validated patch. Forgewatch does not execute project scripts while preparing it, prove an upgrade is compatible, or promise that a version fixing one advisory fixes every advisory. Review migration notes, run checks in a trusted environment, and scan again. Automatic patch preparation remains a separate, deliberately restricted workflow.
+
+Older `scan.json` artifacts can use the new layout immediately. Run a fresh scan to include the new project-specific guidance. Markdown-only artifacts use a safe, text-only formatted fallback.
+
 Forgewatch does not prove that a repository is secure. A clean result means only that every configured check finished and did not find an issue it currently knows how to detect.
 
 ## Safety model

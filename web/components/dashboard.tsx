@@ -3,6 +3,9 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { parseGitHubRepository, repositorySetupUrl } from "@/lib/repository";
+import { ReportDialog, type OpenReport } from "@/components/report-dialog";
+import { ThemeToggle } from "@/components/theme-toggle";
+import type { ScanReport } from "@/lib/report";
 
 type User = { login: string; name: string; avatarUrl: string };
 type Repository = {
@@ -84,7 +87,8 @@ export function Dashboard({ appSlug }: { appSlug: string }) {
   const [monitorsOpen, setMonitorsOpen] = useState(false);
   const previousMonitorAttention = useRef(false);
   const requestedRepository = useRef<string | null>(null);
-  const [report, setReport] = useState<{ name: string; text: string } | null>(null);
+  const [report, setReport] = useState<OpenReport | null>(null);
+  const closeReport = useCallback(() => setReport(null), []);
   const workflowSetupNeeded = error.toLowerCase().includes("workflow is not installed");
 
   const loadMonitors = useCallback(async () => {
@@ -268,8 +272,8 @@ export function Dashboard({ appSlug }: { appSlug: string }) {
     setBusy(true);
     setError("");
     try {
-      const value = await api<{ report: string }>(`/api/scans/${item.lastRunId}/report`);
-      setReport({ name: item.repositoryFullName, text: value.report });
+      const value = await api<{ report: string; scan: ScanReport | null }>(`/api/scans/${item.lastRunId}/report`);
+      setReport({ name: item.repositoryFullName, text: value.report, scan: value.scan });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "The report could not be opened.");
     } finally {
@@ -286,7 +290,7 @@ export function Dashboard({ appSlug }: { appSlug: string }) {
       <main className="shell landing">
         <nav className="nav">
           <a className="brand" href="/" aria-label="Forgewatch home"><span className="brandMark">F</span><span>Forgewatch</span></a>
-          <span className="productTag">Repository security</span>
+          <div className="navActions"><span className="productTag">Repository security</span><ThemeToggle /></div>
         </nav>
         <section className="hero">
           <p className="eyebrow">Repository security, explained clearly</p>
@@ -314,6 +318,7 @@ export function Dashboard({ appSlug }: { appSlug: string }) {
       <nav className="nav">
         <a className="brand" href="/"><span className="brandMark">F</span><span>Forgewatch</span></a>
         <div className="account">
+          <ThemeToggle />
           <img src={user.avatarUrl} alt="" />
           <span>{user.login}</span>
           <form action="/api/auth/logout" method="post"><button className="textButton">Sign out</button></form>
@@ -387,7 +392,7 @@ export function Dashboard({ appSlug }: { appSlug: string }) {
         )}
       </section>
 
-      {report && <div className="modalBackdrop" role="presentation" onMouseDown={() => setReport(null)}><section className="reportModal" role="dialog" aria-modal="true" aria-labelledby="report-title" onMouseDown={(event) => event.stopPropagation()}><div className="reportHeader"><div><p className="step">Latest report</p><h2 id="report-title">{report.name}</h2></div><button className="button secondary compact" onClick={() => setReport(null)}>Close</button></div><pre>{report.text}</pre></section></div>}
+      {report && <ReportDialog report={report} onClose={closeReport} />}
     </main>
   );
 }
